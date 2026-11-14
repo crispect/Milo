@@ -461,13 +461,47 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  function syncProps(){for(const p of state.props){const g=propMeshes.get(p.id);if(!g)continue;if(carrying&&carrying.id===p.id){g.position.copy(dog.localToWorld(new THREE.Vector3(0,.74,1.12)));g.rotation.y=dog.rotation.y}else{g.position.set(p.x,0,p.z);g.rotation.y=0}}}
  syncProps();
 
+ // Architectural detailing and room-scale furnishings, using reusable procedural meshes.
+ const trim=mat(0xc5ae8e,.7),fabricWarm=mat(0xd2aa8f,.98),fabricCool=mat(0x789a9b,.98);
+ function softBox(w,h,d,m,x,y,z,r=.12){
+   const shape=new THREE.Shape();const hw=w/2,hd=d/2,rr=Math.min(r,hw*.6,hd*.6);
+   shape.moveTo(-hw+rr,-hd);shape.lineTo(hw-rr,-hd);shape.quadraticCurveTo(hw,-hd,hw,-hd+rr);
+   shape.lineTo(hw,hd-rr);shape.quadraticCurveTo(hw,hd,hw-rr,hd);
+   shape.lineTo(-hw+rr,hd);shape.quadraticCurveTo(-hw,hd,-hw,hd-rr);
+   shape.lineTo(-hw,-hd+rr);shape.quadraticCurveTo(-hw,-hd,-hw+rr,-hd);
+   const geometry=new THREE.ExtrudeGeometry(shape,{depth:h,bevelEnabled:true,bevelSegments:2,steps:1,bevelSize:.035,bevelThickness:.035,curveSegments:3});
+   geometry.rotateX(-Math.PI/2);
+   const mesh=new THREE.Mesh(geometry,m);mesh.position.set(x,y-h/2,z);mesh.castShadow=true;mesh.receiveShadow=true;scene.add(mesh);return mesh;
+ }
+ // Room identities: layered upholstery, fitted cabinets, carpets and architectural moldings.
+ softBox(2.5,.17,1.8,fabricWarm,-3.1,.11,.95,.25);
+ softBox(2.45,.2,1.15,fabricCool,-3.8,.69,-2.38,.18);
+ for(const x of [-4.8,-2.8])softBox(.45,.23,.95,fabricCool,x,.81,-2.38,.13);
+ softBox(2.3,.16,1.5,M.cream,2.4,.64,-2.68,.18);
+ softBox(1.4,.13,.75,fabricWarm,2.25,.77,-2.72,.16);
+ softBox(1.5,.14,1.15,fabricWarm,-8.4,.17,-6.2,.23);
+ softBox(1.25,.12,.8,fabricCool,8.7,.18,-6.2,.2);
+ softBox(2.5,.14,1.55,M.cream,8.35,.09,-2.45,.2);
+ // Built-in wardrobes and panels along room edges.
+ for(const x of [1.05,1.9,2.75]){box(.78,2.15,.5,trim,x,1.08,-9.95);box(.045,.22,.04,brass,x+.2,1.13,-9.62)}
+ for(let i=0;i<5;i++){box(.78,.78,.55,M.wood,-10.9+i*.84,.43,-9.65);box(.05,.18,.04,brass,-10.65+i*.84,.43,-9.32)}
+ // Small decorative items are deliberately clustered rather than scattered uniformly.
+ for(let i=0;i<3;i++){const x=-10.5+i*.35;cylinder(.11,.15,.28,[ceramic,M.rose,M.blue][i],x,1.06,-9.25)}
+ // Warm baseboards and ceiling beams make room boundaries legible.
+ for(const z of [-10.25,-4.35,.05,4.15])box(11.5,.10,.11,trim,-.1,.13,z,false);
+ for(const x of [-11.7,-5.9,.05,5.9,11.65])box(.11,.1,9.4,trim,x,.13,-5.4,false);
+ // Add subtle window lighting, visible in the daytime and at night.
+ const softWindow=new THREE.DirectionalLight(0xffe6c6,.55);softWindow.position.set(2,7,-8);scene.add(softWindow);
  const dog=new THREE.Group();scene.add(dog);
 const fur=new THREE.MeshStandardMaterial({color:0xb97943,roughness:.98}),lightFur=new THREE.MeshStandardMaterial({color:0xf2c899,roughness:1}),inner=mat(0xb96d65),nose=new THREE.MeshPhysicalMaterial({color:0x272321,roughness:.3,clearcoat:.65}),eye=new THREE.MeshPhysicalMaterial({color:0x17120f,roughness:.13,clearcoat:1});
 sphere(.68,fur,0,.73,-.15,.92,.68,1.32,dog);
+ sphere(.47,fur,0,.79,-.67,.9,.75,.9,dog);
 sphere(.44,lightFur,0,.52,.36,1,.68,1.02,dog);
 sphere(.47,fur,0,1.04,.68,1.05,1,1.02,dog);
+ sphere(.39,fur,0,1.16,.85,1.1,.9,.85,dog);
 sphere(.31,lightFur,0,.82,1.03,1.08,.65,.85,dog);
 sphere(.095,nose,0,.88,1.29,1,.7,.85,dog);
+ sphere(.17,lightFur,0,.69,1.16,1,.48,.6,dog);
 const eyelids=[],earMeshes=[];
  for(const side of [-1,1]){
  const ear=new THREE.Mesh(new THREE.ConeGeometry(.22,.56,4),fur);
@@ -607,7 +641,7 @@ $("#panelClose").onclick=()=>$("#panel").classList.remove("open");
    if(audioOn){soundtrack();nextBird=performance.now()+4500;nextBark=performance.now()+8000}
  };
 
-let following=true,azimuth=.58,elevation=.69,radius=23;
+let following=true,azimuth=.58,elevation=.44,radius=14;
 const focus=new THREE.Vector3(-.3,0,0),clock=new THREE.Clock();
 $("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
 const canvas=renderer.domElement;
@@ -692,7 +726,7 @@ function animate(){
  dog.position.y=.06+Math.abs(Math.sin(frame*11))*.04*speed;
  if(following){focus.x+=(dog.position.x-focus.x)*dt*1.8;focus.z+=(dog.position.z-focus.z)*dt*1.8}
  const length=radius;camera.position.set(focus.x+Math.sin(azimuth)*Math.cos(elevation)*length,Math.sin(elevation)*length+1.2,focus.z+Math.cos(azimuth)*Math.cos(elevation)*length);
- camera.lookAt(focus.x,0,focus.z);
+ camera.lookAt(focus.x,.8,focus.z);
  syncProps();renderer.render(scene,camera);
  if(performance.now()-lastSave>5000){state.lastSim=Date.now();save();lastSave=performance.now()}
 }
