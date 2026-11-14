@@ -76,7 +76,21 @@ const spots={
  estudio:{x:8.4,z:-5.6,label:"Estudio"},
  comedor:{x:8.3,z:-1.4,label:"Comedor"}
 };
-const behaviours=[
+// Persistent props exist independently of the renderer and can be moved by Milo.
+ const propDefaults=[
+ {id:"pelota_azul",type:"ball",x:-2.3,z:1.9,home:"sala"},
+ {id:"cuerda",type:"rope",x:-3.25,z:1.55,home:"sala"},
+ {id:"patito",type:"duck",x:-1.55,z:2.6,home:"sala"},
+ {id:"hueso",type:"bone",x:2.1,z:-.8,home:"cuarto"},
+ {id:"peluche",type:"plush",x:3.7,z:-1.2,home:"cuarto"},
+ {id:"aro",type:"ring",x:-8.2,z:-5.2,home:"biblioteca"},
+ {id:"pelota_verde",type:"ball",x:8.3,z:-5.5,home:"estudio"},
+ {id:"mordedor",type:"bone",x:8.3,z:-1.05,home:"comedor"},
+ {id:"pelota_jardin",type:"ball",x:1.2,z:9.1,home:"patio"},
+ {id:"disco",type:"disc",x:-2.7,z:8.2,home:"patio"}];
+ if(!Array.isArray(state.props))state.props=propDefaults.map(p=>({...p}));
+ for(const p of propDefaults)if(!state.props.some(q=>q.id===p.id))state.props.push({...p});
+ const behaviours=[
  {id:"explorar",name:"Explorando rincones",place:"patio",weight:3},
  {id:"jugar",name:"Jugando con su pelota",place:"sala",weight:3},
  {id:"investigar",name:"Investigando un olor",place:"cocina",weight:2},
@@ -86,7 +100,9 @@ const behaviours=[
  {id:"jardin",name:"Explorando las plantas",place:"arbol",weight:2},
  {id:"leer",name:"Olfateando la biblioteca",place:"biblioteca",weight:1},
  {id:"estudio",name:"Curioseando el estudio",place:"estudio",weight:1},
- {id:"comedor",name:"Inspeccionando el comedor",place:"comedor",weight:1}
+ {id:"comedor",name:"Inspeccionando el comedor",place:"comedor",weight:1},
+ {id:"coleccionar",name:"Reuniendo sus juguetes",place:"caja",weight:2},
+ {id:"juguete",name:"Descubriendo un juguete",place:"estudio",weight:2}
 ];
 function choose(){
  let weighted=[];
@@ -108,7 +124,14 @@ function apply(b,t,offline){
   if(rand()<.21)log("Tomó una siesta tranquila en su dormitorio.","rutina",t);
  }else{
   state.energy=Math.max(9,state.energy-(5+rand()*10));
-  if(b.id==="jugar"){
+  if(b.id==="coleccionar"||b.id==="juguete"){
+     const p=pick(state.props);
+     const destinations=b.id==="coleccionar"?[{x:-4.15,z:2.1},{x:3.5,z:-.8},{x:-8.2,z:-5.2}]:[{x:-2.3,z:1.9},{x:8.3,z:-5.5},{x:1.2,z:9.1}];
+     const target=pick(destinations);p.x=target.x;p.z=target.z;
+     state.traits.creatividad=clamp(state.traits.creatividad+.07);
+     if(rand()<.38)log("Transportó "+p.id.replaceAll("_"," ")+" a otro rincón de la casa.","habito",t);
+   }
+   if(b.id==="jugar"){
    state.mood=Math.min(95,state.mood+5);
    if(rand()<.4)log("Jugó durante un buen rato con su "+state.fav+".","juego",t);
   }
@@ -353,6 +376,58 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  function gr(){grassSeed=(Math.imul(grassSeed,1664525)+1013904223)>>>0;return grassSeed/4294967296}
  for(let i=0;i<650;i++){dummy.position.set(-11.3+gr()*22.5,.08,4.65+gr()*10.5);dummy.rotation.y=gr()*6.28;dummy.scale.set(.65+gr()*.8,.6+gr()*1.3,.65+gr()*.8);dummy.updateMatrix();grassBlades.setMatrixAt(i,dummy.matrix)}
  grassBlades.instanceMatrix.needsUpdate=true;scene.add(grassBlades);
+ 
+ // Distinctive interior styling. Decorative elements remain outside walkable corridors.
+ const brass=mat(0xb99458,.34),ceramic=mat(0xd4d0bd,.3),deep=mat(0x405e66,.86),velvet=mat(0xb47962,.92);
+ function painting(x,y,z,w,h,color){box(w+.12,h+.12,.09,brass,x,y,z);box(w,h,.105,color,x,y,z+.065)}
+ function plant(x,z){cylinder(.28,.22,.46,ceramic,x,.25,z);for(let i=0;i<5;i++)sphere(.23,M.leaf,x+Math.cos(i*1.26)*.19,.76+(i%2)*.2,z+Math.sin(i*1.26)*.16,.7,1.7,.7)}
+ function books(x,z,n=9){for(let i=0;i<n;i++)box(.10+(i%3)*.025,.28+(i%4)*.07,.22,[M.red,deep,M.gold,M.blue][i%4],x+i*.15,.62,z)}
+ function cushion(x,z,color){sphere(.28,color,x,.61,z,1.1,.35,.9)}
+ function frame(x,z){box(1.6,.08,.8,M.wood,x,.94,z);box(1.48,.055,.68,ceramic,x,.99,z)}
+ // Living room: gallery wall, throw pillows, sideboard, plants, dog activity corner.
+ painting(-4.2,1.7,-4.22,1.25,.8,deep);painting(-2.7,1.65,-4.22,.72,.95,velvet);
+ cushion(-4.5,-2.4,M.gold);cushion(-3.1,-2.4,M.rose);
+ plant(-5.25,3.25);books(-5.15,2.9,5);
+ // Bedroom: bedside lighting, dresser, textile basket and framed art.
+ painting(2.6,1.75,-4.22,1.6,.8,M.rose);
+ cylinder(.17,.21,.4,brass,4.45,.96,-3.44);sphere(.23,M.cream,4.45,1.25,-3.44);
+ cushion(1.7,-2.6,M.blue);
+ // Kitchen: hanging utensils, backsplash, storage jars and fruit.
+ box(4.4,.7,.07,ceramic,2.4,1.4,3.95);
+ for(let i=0;i<5;i++){cylinder(.1,.12,.27,[ceramic,M.blue,M.gold][i%3],1+i*.48,1.02,3.5)}
+ for(let i=0;i<4;i++)sphere(.12,[M.red,M.gold,M.leaf][i%3],3.2+(i%2)*.23,1.05,3.25);
+ // Library: reading nook with rug, decorative books and houseplant.
+ painting(-8.9,1.7,-10.02,1.45,.75,deep);
+ plant(-10.8,-5.3);books(-10.6,-8.6,8);
+ // Studio: monitor, drawing board, stationery, art and a small reading rug.
+ box(1.18,.7,.08,M.dark,8.8,1.3,-8.2);box(.95,.5,.09,deep,8.8,1.33,-8.12);
+ cylinder(.08,.08,.3,metal,8.8,.99,-8.2);
+ painting(10.9,1.75,-10.02,1.1,1.2,M.gold);
+ for(let i=0;i<5;i++)box(.07,.35,.07,[M.red,M.gold,M.blue][i%3],7.6+i*.12,1.08,-8.05);
+ // Dining room: place settings and hanging decorations.
+ for(const x of [7.6,9.1])for(const z of [-2.8,-2.1])cylinder(.21,.21,.025,ceramic,x,.89,z);
+ painting(10.6,1.6,-4.36,1.15,.75,M.leaf);
+ // Yard: agility tunnel, stepping pads and chew station.
+ const tunnelMat=mat(0x9a6554,.84);
+ for(let i=0;i<5;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(.49,.09,8,18),tunnelMat);ring.position.set(5.1,.55,7.0+i*.32);scene.add(ring)}
+ for(let i=0;i<5;i++)cylinder(.24,.26,.07,stone,-8.8+i*.7,.08,9.4);
+ // Real, persistent interactive toys. Meshes are updated from the same state used by the diary.
+ const propMeshes=new Map();
+ function toyMesh(p){
+   const g=new THREE.Group();scene.add(g);
+   const add=(geometry,material,x=0,y=0,z=0)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=true;g.add(m)};
+   if(p.type==="ball")add(new THREE.SphereGeometry(.19,16,12),p.id==="pelota_verde"?M.leaf:M.blue,0,.2);
+   if(p.type==="disc")add(new THREE.CylinderGeometry(.3,.3,.055,24),M.red,0,.08);
+   if(p.type==="ring"){const mesh=new THREE.Mesh(new THREE.TorusGeometry(.24,.075,8,20),M.gold);mesh.rotation.x=Math.PI/2;mesh.position.y=.12;g.add(mesh)}
+   if(p.type==="bone"){add(new THREE.CylinderGeometry(.09,.09,.42,10),M.cream,0,.13);for(const y of [-.18,.18])add(new THREE.SphereGeometry(.14,10,8),M.cream,0,.13+y)}
+   if(p.type==="rope"){for(let i=0;i<7;i++)add(new THREE.SphereGeometry(.085,8,6),i%2?M.red:M.gold,(i-3)*.09,.12,Math.sin(i)*.08)}
+   if(p.type==="plush"||p.type==="duck"){add(new THREE.SphereGeometry(.22,12,10),p.type==="duck"?M.gold:M.rose,0,.22);add(new THREE.SphereGeometry(.14,12,10),M.cream,0,.42,.06)}
+   propMeshes.set(p.id,g);return g;
+ }
+ for(const p of state.props)toyMesh(p);
+ function syncProps(){for(const p of state.props){const g=propMeshes.get(p.id);if(g)g.position.set(p.x,0,p.z)}}
+ syncProps();
+
  const dog=new THREE.Group();scene.add(dog);
 const fur=mat(0xc98c57),lightFur=mat(0xffd5a1),inner=mat(0xe89782),nose=mat(0x332a29),eye=mat(0x1e221c);
 sphere(.68,fur,0,.73,-.15,.92,.68,1.32,dog);
@@ -529,7 +604,7 @@ function animate(){
  if(following){focus.x+=(dog.position.x-focus.x)*dt*1.8;focus.z+=(dog.position.z-focus.z)*dt*1.8}
  const length=radius;camera.position.set(focus.x+Math.sin(azimuth)*Math.cos(elevation)*length,Math.sin(elevation)*length+1.2,focus.z+Math.cos(azimuth)*Math.cos(elevation)*length);
  camera.lookAt(focus.x,0,focus.z);
- renderer.render(scene,camera);
+ syncProps();renderer.render(scene,camera);
  if(performance.now()-lastSave>5000){state.lastSim=Date.now();save();lastSave=performance.now()}
 }
 animate();
