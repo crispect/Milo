@@ -42,6 +42,7 @@ button:focus-visible{outline:3px solid #fff}
 <script type="module">
 try {
 const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js");
+ document.querySelector("#load p").textContent="Preparando la escena 3D…";
 const $ = s => document.querySelector(s);
 const KEY = "milo-life-v1";
 const NOW = Date.now();
@@ -276,11 +277,11 @@ sphere(.35,M.rose,1.1,.33,-.83,1,.35,1.2);
    branch([x,.05,z],[x,y,z],.23*scale);
    let seed=Math.floor((x+22)*1000+(z+22)*900);
    const rnd=()=>{seed=(Math.imul(seed,1664525)+1013904223)>>>0;return seed/4294967296};
-   for(let i=0;i<11;i++){
+   for(let i=0;i<7;i++){
      const angle=i*2.399,level=.48+(i%5)*.13,reach=(.7+rnd()*.65)*scale;
      const a=[x,y*level,z],b=[x+Math.cos(angle)*reach,y*(level+.17+rnd()*.12),z+Math.sin(angle)*reach];
      branch(a,b,.07*scale);
-     for(let j=0;j<7;j++){
+     for(let j=0;j<4;j++){
        const aa=angle+j*2.4,rr=(.13+rnd()*.36)*scale;
        const leaf=new THREE.Mesh(new THREE.IcosahedronGeometry((.20+rnd()*.11)*scale,0),foliage[(i+j)%foliage.length]);
        leaf.position.set(b[0]+Math.cos(aa)*rr,b[1]+(rnd()-.5)*.45*scale,b[2]+Math.sin(aa)*rr);
@@ -380,7 +381,7 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
    const sx=gx(a.x),sz=gz(a.z),tx=gx(b.x),tz=gz(b.z);
    const key=(x,z)=>x+":"+z,origin=key(sx,sz),goal=key(tx,tz);
    const open=[{x:sx,z:sz,g:0,f:Math.abs(sx-tx)+Math.abs(sz-tz)}],best=new Map([[origin,0]]),parent=new Map(),closed=new Set();
-   for(let n=0;open.length&&n<5500;n++){
+   for(let n=0;open.length&&n<700;n++){
      let m=0;for(let i=1;i<open.length;i++)if(open[i].f<open[m].f)m=i;
      const v=open.splice(m,1)[0],id=key(v.x,v.z);if(closed.has(id))continue;
      if(id===goal){const path=[];let p=id;while(p!==origin){const [x,z]=p.split(":").map(Number);path.push({x:wx(x),z:wz(z)});p=parent.get(p);if(!p)break}return path.reverse()}
@@ -396,10 +397,10 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
 
  // Warm window illumination, physical accents and contact shadows.
  const windowGlow=new THREE.PointLight(0xffc58d,1.2,10,2);windowGlow.position.set(-3.7,2,-3.6);scene.add(windowGlow);
- const grassBlades=new THREE.InstancedMesh(new THREE.ConeGeometry(.028,.19,3),new THREE.MeshStandardMaterial({color:0x65975e,roughness:1}),650);
+ const grassBlades=new THREE.InstancedMesh(new THREE.ConeGeometry(.028,.19,3),new THREE.MeshStandardMaterial({color:0x65975e,roughness:1}),350);
  const dummy=new THREE.Object3D();let grassSeed=91823;
  function gr(){grassSeed=(Math.imul(grassSeed,1664525)+1013904223)>>>0;return grassSeed/4294967296}
- for(let i=0;i<650;i++){dummy.position.set(-11.3+gr()*22.5,.08,4.65+gr()*10.5);dummy.rotation.y=gr()*6.28;dummy.scale.set(.65+gr()*.8,.6+gr()*1.3,.65+gr()*.8);dummy.updateMatrix();grassBlades.setMatrixAt(i,dummy.matrix)}
+ for(let i=0;i<350;i++){dummy.position.set(-11.3+gr()*22.5,.08,4.65+gr()*10.5);dummy.rotation.y=gr()*6.28;dummy.scale.set(.65+gr()*.8,.6+gr()*1.3,.65+gr()*.8);dummy.updateMatrix();grassBlades.setMatrixAt(i,dummy.matrix)}
  grassBlades.instanceMatrix.needsUpdate=true;scene.add(grassBlades);
  
  // Distinctive interior styling. Decorative elements remain outside walkable corridors.
@@ -521,18 +522,18 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  const mulch=new THREE.MeshStandardMaterial({color:0x755a3f,roughness:1});
  const leafColors=[0x4b814e,0x619259,0x8aab67,0x3f7554].map(c=>new THREE.MeshStandardMaterial({color:c,roughness:1}));
  const gardenRand=(()=>{let n=74281;return()=>{n=(Math.imul(n,1664525)+1013904223)>>>0;return n/4294967296}})();
- for(let i=0;i<85;i++){
+ for(let i=0;i<38;i++){
    const x=-11.3+gardenRand()*22.4,z=5.4+gardenRand()*9.7;
    if(Math.abs(x)<1.8&&z<8.7)continue;
    const bush=new THREE.Mesh(new THREE.IcosahedronGeometry(.15+gardenRand()*.28,1),leafColors[i%4]);
    bush.position.set(x,.18+gardenRand()*.2,z);bush.scale.set(1.15,.65,1.1);scene.add(bush);
  }
- for(let i=0;i<48;i++){
+ for(let i=0;i<22;i++){
    const x=-10.8+gardenRand()*20.8,z=5+gardenRand()*9.4;
    const stoneMesh=new THREE.Mesh(new THREE.DodecahedronGeometry(.13+gardenRand()*.16,0),gravel);
    stoneMesh.position.set(x,.06,z);stoneMesh.scale.set(1.4,.25,.9);stoneMesh.rotation.y=gardenRand()*6.28;scene.add(stoneMesh);
  }
- for(let i=0;i<30;i++){
+ for(let i=0;i<18;i++){
    const x=-10.5+gardenRand()*20.4,z=6+gardenRand()*8.3;
    const stem=new THREE.Mesh(new THREE.CylinderGeometry(.012,.018,.25,5),M.leaf);
    stem.position.set(x,.17,z);scene.add(stem);
@@ -578,7 +579,7 @@ const tail=new THREE.Group();tail.position.set(0,.93,-.88);dog.add(tail);sphere(
  sphere(.075,M.gold,0,.54,.78,.85,1,.3,dog);
  for(const leg of legs)for(let k=-1;k<=1;k++)sphere(.045,fur,k*.095,-.43,.23,.7,.4,1,leg.pivot);
  // Low-poly groomed fur tufts use instancing to keep draw calls low on iPhone.
- const furCount=innerWidth<850?380:720;
+ const furCount=innerWidth<850?220:520;
  const furGeo=new THREE.ConeGeometry(.018,.105,3);
  const furMat=new THREE.MeshStandardMaterial({color:0xb97943,roughness:1,side:THREE.DoubleSide});
  const tufts=new THREE.InstancedMesh(furGeo,furMat,furCount);
@@ -743,7 +744,8 @@ function completed(){
  moving=false;nextAt=performance.now()+(4000+rand()*5000);
   if(audioOn&&(current.id==="jugar"||current.id==="explorar")&&rand()<.35)bark();
 }
-if(state.position)dog.position.set(state.position.x,.05,state.position.z);
+document.querySelector("#load p").textContent="Iniciando la vida de Milo…";
+ if(state.position)dog.position.set(state.position.x,.05,state.position.z);
  if(isTransport(current))beginTransport(current);
  if(!clearAt(dog.position.x,dog.position.z)){const safe=nearest(dog.position.x,dog.position.z);dog.position.set(safe.x,.05,safe.z)}
  plan();
