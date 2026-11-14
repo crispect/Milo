@@ -150,14 +150,14 @@ const camera=new THREE.PerspectiveCamera(47,innerWidth/innerHeight,.1,120);
 const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
 renderer.setSize(innerWidth,innerHeight);
 renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));
-renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;renderer.physicallyCorrectLights=true;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.47;
 $("#scene").appendChild(renderer.domElement);
 const ambient=new THREE.HemisphereLight(0xfff5da,0x667c67,2.4);scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xffe3b3,2.5);sun.position.set(-5,13,10);sun.castShadow=true;
-sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;
-sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;sun.shadow.normalBias=.035;scene.add(sun);
+sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-27;sun.shadow.camera.right=27;
+sun.shadow.camera.top=27;sun.shadow.camera.bottom=-27;sun.shadow.normalBias=.035;scene.add(sun);
 function mat(color,roughness=1){return new THREE.MeshStandardMaterial({color,roughness})}
 const M={
  earth:mat(0x81a36f),grass:mat(0x86b57b),wall:mat(0xe9dcc8),wood:mat(0xb8845e),
@@ -169,12 +169,12 @@ function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeom
 function sphere(r,m,x,y,z,sx=1,sy=1,sz=1,parent=scene){const o=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
 function cylinder(r1,r2,h,m,x,y,z,parent=scene){const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,12),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o}
 box(40,.3,40,M.earth,0,-.24,0,false);
-box(11.8,.12,8.7,M.floor,-.08,-.035,0,false);
-box(11.8,.1,8,M.grass,-.08,-.04,8.2,false);
+box(23.8,.12,15.5,M.floor,-.08,-.035,-2.7,false);
+box(23.8,.1,12,M.grass,-.08,-.04,10.2,false);
 const tile=new THREE.GridHelper(11.8,12,0xe4c39e,0xe4c39e);tile.position.set(-.08,.04,0);tile.material.opacity=.2;tile.material.transparent=true;scene.add(tile);
 // Open-front dollhouse walls and three cozy rooms.
-box(.18,2.45,8.7,M.wall,-5.9,1.2,0);
-box(11.8,2.45,.18,M.wall,-.07,1.2,-4.35);
+box(.18,3.1,15.5,M.wall,-11.9,1.55,-2.7);
+box(23.8,3.1,.18,M.wall,-.07,1.55,-10.45);
 box(5.45,2.4,.16,M.wall,3.1,1.2,.05);
 box(.14,2.4,2.4,M.wall,.05,1.2,-3.12);
 box(.14,2.4,2.4,M.wall,.05,1.2,2.95);
@@ -216,7 +216,44 @@ for(let i=0;i<26;i++){
 }
 box(1.8,.17,.65,M.wood,-3.2,.4,6.5);
 for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
-const dog=new THREE.Group();scene.add(dog);
+
+ // Expanded architectural wings: library, studio, sunroom and sheltered terrace.
+ const oak=mat(0x9b7050),linen=mat(0xcac0a8),stone=mat(0xb5afa3),glass=new THREE.MeshPhysicalMaterial({color:0xc3e4df,transparent:true,opacity:.26,roughness:.08,metalness:.04,side:THREE.DoubleSide}),metal=mat(0x424e4b);
+ box(5.7,.13,9.7,M.plank,-8.85,.035,-5.4,false);
+ box(5.7,.13,9.7,M.plank,8.8,.035,-5.4,false);
+ box(.17,3.1,9.6,M.wall,11.8,1.55,-5.45);
+ box(.17,3.1,9.6,M.wall,-11.8,1.55,-5.45);
+ // Low walls and panoramic glazing preserve visibility from the observer camera.
+ for(const x of [-8.85,8.8]){
+   box(5.7,.55,.16,stone,x,.28,-10.1);
+   box(5.7,.18,.16,oak,x,2.9,-10.1);
+   for(let k=-1;k<=1;k++)box(.09,2.2,.1,metal,x+k*1.85,1.75,-10.1);
+   box(5.4,2.15,.055,glass,x,1.75,-10.1,false);
+ }
+ // Library with shelves, books, lamp and lounge chair.
+ for(let j=0;j<3;j++){box(4.4,.13,.43,oak,-8.9,.65+j*.75,-9.35);for(let k=0;k<12;k++){const h=.28+(k%4)*.055;box(.19,h,.29,mat([0x6b877b,0xb97b5d,0xb1a174,0x68788a][(k+j)%4]),-10.8+k*.34,.78+j*.75,-9.35)}}
+ box(1.55,.38,1.35,M.sofa,-8.5,.32,-6.3);box(1.55,.7,.22,M.sofa,-8.5,.78,-6.9);
+ cylinder(.28,.34,.08,stone,-6.95,.75,-6.3);cylinder(.06,.06,.7,metal,-6.95,.39,-6.3);
+ // Sunlit studio: desk, books, plants, woven mat.
+ box(3.1,.14,1.05,oak,8.8,.84,-8.2);
+ for(const x of [7.45,10.15])for(const z of [-8.65,-7.8])box(.13,.82,.13,metal,x,.42,z);
+ box(1.25,.14,.92,linen,8.85,.5,-6.6);box(1.25,.8,.16,linen,8.85,.93,-7.1);
+ cylinder(.34,.28,.45,stone,10.5,.28,-5.7);sphere(.48,M.leaf,10.5,.92,-5.7,.8,1.25,.8);
+ // Dining area with four chairs and pendant-like ceiling accents.
+ box(2.6,.17,1.65,oak,8.35,.77,-2.45);
+ for(const x of [7.4,9.3])for(const z of [-3.7,-1.2]){box(.72,.13,.7,linen,x,.49,z);box(.72,.68,.12,oak,x,.87,z+(z< -2.4?-.35:.35))}
+ // Terrace, stone stepping path, planters and garden beds.
+ box(8,.16,2.9,M.plank,-7.9,.04,5.5,false);
+ for(let k=0;k<9;k++){box(.83,.055,.62,stone,-7.7+k*.7,.055,7.8+k*.33,false)}
+ for(let k=0;k<6;k++){const x=-10.5+k*3.9;box(.9,.52,.9,oak,x,.22,12.2);sphere(.47,M.leaf,x,.72,12.2,1,.7,1)}
+ for(let k=0;k<24;k++){const x=-11.2+(k%12)*1.95,z=13+Math.floor(k/12)*1.35;sphere(.12, k%3===0?M.rose:k%3===1?M.gold:M.white,x,.13,z)}
+ // Skirting, wall trims and warm pools of light.
+ for(const x of [-11.75,11.75])box(.12,.17,9.4,oak,x,.12,-5.4);
+ for(const z of [-10.3,-4.35])box(23.4,.13,.13,oak,0,.12,z);
+ const fill=new THREE.PointLight(0xffd7a2,1.8,12,2);fill.position.set(-8,2.7,-6);scene.add(fill);
+ const fill2=new THREE.PointLight(0xffe1b6,1.8,12,2);fill2.position.set(8.5,2.7,-6);scene.add(fill2);
+
+ const dog=new THREE.Group();scene.add(dog);
 const fur=mat(0xc98c57),lightFur=mat(0xffd5a1),inner=mat(0xe89782),nose=mat(0x332a29),eye=mat(0x1e221c);
 sphere(.68,fur,0,.73,-.15,.92,.68,1.32,dog);
 sphere(.44,lightFur,0,.52,.36,1,.68,1.02,dog);
@@ -292,21 +329,22 @@ function showPanel(mode){
 $("#journal").onclick=()=>showPanel("journal");
 $("#personality").onclick=()=>showPanel("personality");
 $("#panelClose").onclick=()=>$("#panel").classList.remove("open");
-let following=true,azimuth=.58,elevation=.82,radius=17;
-const focus=new THREE.Vector3(-.3,0,2.2),clock=new THREE.Clock();
+let following=true,azimuth=.58,elevation=.69,radius=23;
+const focus=new THREE.Vector3(-.3,0,0),clock=new THREE.Clock();
 $("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
 const canvas=renderer.domElement;
-const pointers=new Map();let pinchDist=0,oldPoint=null;
+const pointers=new Map();let pinchDist=0,oldMid=null;
 canvas.addEventListener("pointerdown",e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId)});
 canvas.addEventListener("pointermove",e=>{
  if(!pointers.has(e.pointerId))return;
  const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
- if(pointers.size===1){azimuth-=(e.clientX-old.x)*.006;elevation=Math.max(.3,Math.min(1.4,elevation+(e.clientY-old.y)*.004))}
- else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinchDist)radius=Math.max(7,Math.min(27,radius*pinchDist/d));pinchDist=d}
+ if(pointers.size===1){azimuth-=(e.clientX-old.x)*.004;elevation=Math.max(.16,Math.min(1.38,elevation+(e.clientY-old.y)*.003))}
+ else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),mid={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};if(pinchDist)radius=Math.max(3.5,Math.min(48,radius*pinchDist/d));if(oldMid){const dx=(mid.x-oldMid.x)*radius*.0015,dz=(mid.y-oldMid.y)*radius*.0015;focus.x-=dx*Math.cos(azimuth)+dz*Math.sin(azimuth);focus.z+=dx*Math.sin(azimuth)-dz*Math.cos(azimuth);following=false;$("#follow").textContent="◌ Vista libre"}pinchDist=d;oldMid=mid}
 });
-const end=e=>{pointers.delete(e.pointerId);pinchDist=0};
+const end=e=>{pointers.delete(e.pointerId);pinchDist=0;oldMid=null};
 canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);
-canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(6,Math.min(28,radius+Math.sign(e.deltaY)*.7))},{passive:false});
+canvas.addEventListener("dblclick",()=>{following=true;$("#follow").textContent="✦ Seguir a Milo"});
+ canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(3.5,Math.min(48,radius+Math.sign(e.deltaY)*.85))},{passive:false});
 let current=choose(),nextAt=performance.now(),lastSave=performance.now(),moving=true;
 let dogTarget=spots[current.place];
 updateLabel(current);
