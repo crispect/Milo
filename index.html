@@ -125,9 +125,10 @@ function apply(b,t,offline){
  }else{
   state.energy=Math.max(9,state.energy-(5+rand()*10));
   if(b.id==="coleccionar"||b.id==="juguete"){
-     const p=pick(state.props);
+     const p=b.propId?state.props.find(q=>q.id===b.propId):pick(state.props);
+     if(!p)return;
      const destinations=b.id==="coleccionar"?[{x:-4.15,z:2.1},{x:3.5,z:-.8},{x:-8.2,z:-5.2}]:[{x:-2.3,z:1.9},{x:8.3,z:-5.5},{x:1.2,z:9.1}];
-     const target=pick(destinations);p.x=target.x;p.z=target.z;
+     const target=b.destination||pick(destinations);p.x=target.x;p.z=target.z;
      state.traits.creatividad=clamp(state.traits.creatividad+.07);
      if(rand()<.38)log("Transportó "+p.id.replaceAll("_"," ")+" a otro rincón de la casa.","habito",t);
    }
@@ -411,6 +412,38 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  const tunnelMat=mat(0x9a6554,.84);
  for(let i=0;i<5;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(.49,.09,8,18),tunnelMat);ring.position.set(5.1,.55,7.0+i*.32);scene.add(ring)}
  for(let i=0;i<5;i++)cylinder(.24,.26,.07,stone,-8.8+i*.7,.08,9.4);
+
+ // Layered home decor, with real volume, warm palettes and varied silhouettes.
+ // Kept clear of main walkways; architectural reference photos are design direction.
+ function framedMirror(x,y,z,w,h){box(w+.12,h+.12,.07,M.wood,x,y,z);box(w,h,.075,glass,x,y,z+.045)}
+ function lamp(x,z){cylinder(.07,.09,.54,brass,x,.43,z);const shade=new THREE.Mesh(new THREE.ConeGeometry(.32,.43,12,1,true),new THREE.MeshStandardMaterial({color:0xf5d7a4,roughness:.95,side:THREE.DoubleSide}));shade.position.set(x,.88,z);scene.add(shade)}
+ function basket(x,z){cylinder(.37,.3,.28,oak,x,.16,z);cylinder(.32,.32,.08,M.cream,x,.31,z)}
+ function vase(x,y,z){cylinder(.13,.2,.3,ceramic,x,y,z);sphere(.2,M.leaf,x,y+.4,z,.8,1.5,.8)}
+ // Living: floor lamp, layered cushions, media console and woven toy basket.
+ lamp(-5.45,-1.25);basket(-1.5,2.9);
+ box(2.2,.5,.48,oak,-1.55,.28,-3.7);
+ box(1.65,.9,.08,M.dark,-1.55,1.27,-4.15);
+ for(let i=0;i<4;i++)sphere(.24,[M.rose,M.gold,M.blue,M.cream][i],-4.7+i*.47,.65,-2.4,1,.38,1);
+ // Kitchen: shelves, chopping boards and hanging mugs.
+ for(let i=0;i<2;i++){box(2.2,.11,.4,oak,1.8,1.8+i*.47,3.86);for(let k=0;k<4;k++)cylinder(.13,.13,.24,[ceramic,M.blue,M.gold][k%3],1.15+k*.43,1.98+i*.47,3.82)}
+ // Bedroom: soft dog mattress, bedside lamp, dressing mirror.
+ cylinder(.74,.74,.16,velvet,1.3,.12,-1.25);sphere(.4,M.cream,1.3,.24,-1.25,1.4,.25,.9);
+ framedMirror(5.15,1.45,-3.75,.7,1.45);
+ lamp(4.45,-3.44);
+ // Library: layered books, rug and little dog-safe hideaway.
+ basket(-10.8,-6.9);box(1.1,.52,.8,oak,-10.3,.27,-7.5);
+ for(let i=0;i<5;i++)box(.13,.35+(i%3)*.08,.27,[deep,M.red,M.gold][i%3],-10.7+i*.17,.8,-7.5);
+ // Studio: sketch boards and plant group.
+ vase(10.45,1,-8.2);plant(10.8,-6.8);
+ // Dining: centerpiece, shelves and wall art.
+ vase(8.35,.89,-2.45);
+ box(2.2,.12,.45,oak,10.45,1.5,-3.9);
+ for(let i=0;i<4;i++)cylinder(.13,.13,.22,[M.blue,ceramic,M.rose][i%3],9.7+i*.42,1.69,-3.9);
+ // Garden: dog play corner, extra flower pots, small garden shed.
+ box(2.4,1.7,1.25,oak,9.6,.85,12.6);
+ box(2.6,.16,1.5,deep,9.6,1.8,12.6);
+ for(let i=0;i<6;i++)plant(-10.8+i*1.3,13.7);
+
  // Real, persistent interactive toys. Meshes are updated from the same state used by the diary.
  const propMeshes=new Map();
  function toyMesh(p){
@@ -425,7 +458,7 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
    propMeshes.set(p.id,g);return g;
  }
  for(const p of state.props)toyMesh(p);
- function syncProps(){for(const p of state.props){const g=propMeshes.get(p.id);if(g)g.position.set(p.x,0,p.z)}}
+ function syncProps(){for(const p of state.props){const g=propMeshes.get(p.id);if(!g)continue;if(carrying&&carrying.id===p.id){g.position.copy(dog.localToWorld(new THREE.Vector3(0,.74,1.12)));g.rotation.y=dog.rotation.y}else{g.position.set(p.x,0,p.z);g.rotation.y=0}}}
  syncProps();
 
  const dog=new THREE.Group();scene.add(dog);
@@ -560,14 +593,35 @@ canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel"
 canvas.addEventListener("dblclick",()=>{following=true;$("#follow").textContent="✦ Seguir a Milo"});
  canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(3.5,Math.min(48,radius+Math.sign(e.deltaY)*.85))},{passive:false});
 let current=choose(),nextAt=performance.now(),lastSave=performance.now(),moving=true;
-let dogTarget=spots[current.place],waypoints=[];
+ let carrying=null,carryPhase="",dogTarget=spots[current.place],waypoints=[];
+ function isTransport(b){return b.id==="coleccionar"||b.id==="juguete"}
+ function beginTransport(b){
+   const available=state.props.filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.z));
+   if(!available.length)return false;
+   const p=pick(available),destinations=b.id==="coleccionar"?
+     [{x:-4.15,z:2.1},{x:3.5,z:-.8},{x:-8.2,z:-5.2}]:
+     [{x:-2.3,z:1.9},{x:8.3,z:-5.5},{x:1.2,z:9.1}];
+   b.propId=p.id;b.destination=pick(destinations);
+   carrying=p;carryPhase="pickup";dogTarget={x:p.x,z:p.z};return true;
+ }
+ function pickup(){
+   carryPhase="delivery";dogTarget=current.destination;plan();
+   if(audioOn)tone(420,audioCtx.currentTime,.13,.025,"triangle");
+ }
+ function drop(){
+   carryPhase="";carrying=null;
+   if(audioOn)tone(320,audioCtx.currentTime,.16,.022,"triangle");
+ }
  function plan(){waypoints=route(dog.position,dogTarget);if(waypoints.length===0){dogTarget=nearest(dog.position.x,dog.position.z)}}
 updateLabel(current);
 function startNew(){
- current=choose();dogTarget=spots[current.place];moving=true;plan();updateLabel(current);
+ current=choose();carrying=null;carryPhase="";
+ if(!isTransport(current)||!beginTransport(current))dogTarget=spots[current.place];
+ moving=true;plan();updateLabel(current);
 }
 function completed(){
  apply(current,Date.now(),false);
+ if(carryPhase==="delivery")drop();
  state.lastSim=Date.now();
  for(const c of state.creations){if(!c.drawn){c.drawn=true;drawCreation(c)}}
  save();
@@ -575,6 +629,7 @@ function completed(){
   if(audioOn&&(current.id==="jugar"||current.id==="explorar")&&rand()<.35)bark();
 }
 if(state.position)dog.position.set(state.position.x,.05,state.position.z);
+ if(isTransport(current))beginTransport(current);
  if(!clearAt(dog.position.x,dog.position.z)){const safe=nearest(dog.position.x,dog.position.z);dog.position.set(safe.x,.05,safe.z)}
  plan();
 $("#load").remove();
@@ -590,7 +645,7 @@ function animate(){
  if(moving){
   const waypoint=waypoints[0]||dogTarget;
    const dx=waypoint.x-dog.position.x,dz=waypoint.z-dog.position.z,dist=Math.hypot(dx,dz);
-  if(dist<.13){if(waypoints.length)waypoints.shift();else completed()}else{
+  if(dist<.13){if(waypoints.length)waypoints.shift();else if(carryPhase==="pickup")pickup();else completed()}else{
    speed=Math.min(1,dist*2);
    const step=Math.min(dist,dt*1.35),nx=dog.position.x+dx/dist*step,nz=dog.position.z+dz/dist*step;
     if(clearAt(nx,nz)){dog.position.x=nx;dog.position.z=nz}else{plan();if(!waypoints.length){moving=false;nextAt=performance.now()+1200}}
