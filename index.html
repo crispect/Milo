@@ -36,7 +36,7 @@ button:focus-visible{outline:3px solid #fff}
 <body>
 <div id="scene"></div><div id="shade"></div>
 <header><div><div class="logo">Milo <span style="font-size:20px">🐾</span></div><div class="tag">Una vida propia</div></div><div class="pill"><strong id="day">Día 1</strong><span id="where">En casa · explorando</span></div></header>
-<div id="bottom"><div id="thought">Milo está descubriendo su hogar…</div><div class="actions"><button class="primary" id="follow">✦ Seguir a Milo</button><button id="journal">📖 Diario</button><button id="personality">♡ Personalidad</button></div><div id="hint">Desliza para girar · Pellizca para acercar</div></div>
+<div id="bottom"><div id="thought">Milo está descubriendo su hogar…</div><div class="actions"><button class="primary" id="follow">✦ Seguir a Milo</button><button id="journal">📖 Diario</button><button id="personality">♡ Personalidad</button><button id="sound" aria-label="Activar sonidos">🔇 Sonido</button></div><div id="hint">Desliza para girar · Pellizca para acercar</div></div>
 <aside id="panel" aria-label="Información de Milo"><button id="panelClose" aria-label="Cerrar">×</button><h2 id="panelTitle">Diario</h2><div id="panelContent"></div></aside>
 <div id="load"><div><div class="big">🐕</div><h2>La casa de Milo</h2><p>Preparando un pequeño mundo independiente…</p><div id="loadError"></div></div></div>
 <script type="module">
@@ -162,17 +162,41 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.
 $("#scene").appendChild(renderer.domElement);
 const ambient=new THREE.HemisphereLight(0xfff5da,0x667c67,2.4);scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xffe3b3,2.5);sun.position.set(-5,13,10);sun.castShadow=true;
-sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-27;sun.shadow.camera.right=27;
+sun.shadow.mapSize.set(innerWidth<800?1024:2048,innerWidth<800?1024:2048);sun.shadow.camera.left=-27;sun.shadow.camera.right=27;
 sun.shadow.camera.top=27;sun.shadow.camera.bottom=-27;sun.shadow.normalBias=.035;scene.add(sun);
-function mat(color,roughness=1){return new THREE.MeshStandardMaterial({color,roughness})}
+// Seeded procedural surface detail: no external textures, efficient on mobile.
+ function texture(kind,base,grain,seed=42){
+   const canvas=document.createElement("canvas");canvas.width=canvas.height=256;
+   const c=canvas.getContext("2d"),im=c.createImageData(256,256);let v=seed>>>0;
+   const rnd=()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296};
+   for(let y=0;y<256;y++)for(let x=0;x<256;x++){
+     let variation=(rnd()-.5)*grain;
+     if(kind==="wood")variation+=Math.sin(y*.39+Math.sin(x*.055)*3)*11+Math.sin(y*.09)*9;
+     if(kind==="plaster")variation+=Math.sin(x*.12+y*.17)*2.5;
+     if(kind==="stone")variation+=Math.sin(x*.19)*Math.sin(y*.15)*8;
+     if(kind==="fabric")variation+=((x%4===0)||(y%4===0))?-8:3;
+     const i=(y*256+x)*4;for(let k=0;k<3;k++)im.data[i+k]=Math.max(0,Math.min(255,base[k]+variation));im.data[i+3]=255;
+   }
+   c.putImageData(im,0,0);
+   if(kind==="wood"){c.strokeStyle="rgba(53,35,19,.15)";c.lineWidth=1;for(let j=0;j<25;j++){let y=rnd()*256;c.beginPath();c.moveTo(0,y);c.bezierCurveTo(80,y+4,180,y-5,256,y+2);c.stroke()}}
+   const t=new THREE.CanvasTexture(canvas);t.wrapS=t.wrapT=THREE.RepeatWrapping;t.colorSpace=THREE.SRGBColorSpace;t.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return t;
+ }
+ const woodTex=texture("wood",[184,143,100],24,22),wallTex=texture("plaster",[229,219,201],15,35),
+ fabricTex=texture("fabric",[115,153,142],18,19),stoneTex=texture("stone",[178,169,155],23,28);
+ function mat(color,roughness=1){return new THREE.MeshStandardMaterial({color,roughness})}
 const M={
  earth:mat(0x81a36f),grass:mat(0x86b57b),wall:mat(0xe9dcc8),wood:mat(0xb8845e),
  plank:mat(0xbca381),cream:mat(0xf6e9d1),floor:mat(0xeac9a4),
  white:mat(0xfff2e3),dark:mat(0x27312b),rose:mat(0xce8b81),leaf:mat(0x458e61),
- sofa:mat(0x769b8c),gold:mat(0xe3b453),blue:mat(0x8abdbb),red:mat(0xb9564c)
+ sofa:new THREE.MeshStandardMaterial({map:fabricTex,roughness:.95}),gold:mat(0xe3b453,.52),blue:mat(0x8abdbb,.65),red:mat(0xb9564c,.72)
 };
-function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;scene.add(o);return o}
-function sphere(r,m,x,y,z,sx=1,sy=1,sz=1,parent=scene){const o=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
+M.floor=new THREE.MeshStandardMaterial({map:woodTex,roughness:.78});
+ M.plank=new THREE.MeshStandardMaterial({map:woodTex,roughness:.72});
+ M.wall=new THREE.MeshStandardMaterial({map:wallTex,roughness:.97});
+ M.wood=new THREE.MeshStandardMaterial({map:woodTex,roughness:.74});
+ M.earth=new THREE.MeshStandardMaterial({map:stoneTex,roughness:1});
+ function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;scene.add(o);return o}
+function sphere(r,m,x,y,z,sx=1,sy=1,sz=1,parent=scene){const o=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
 function cylinder(r1,r2,h,m,x,y,z,parent=scene){const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,12),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o}
 box(40,.3,40,M.earth,0,-.24,0,false);
 box(23.8,.12,15.5,M.floor,-.08,-.035,-2.7,false);
@@ -322,6 +346,13 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
    return [];
  }
 
+ // Warm window illumination, physical accents and contact shadows.
+ const windowGlow=new THREE.PointLight(0xffc58d,1.2,10,2);windowGlow.position.set(-3.7,2,-3.6);scene.add(windowGlow);
+ const grassBlades=new THREE.InstancedMesh(new THREE.ConeGeometry(.028,.19,3),new THREE.MeshStandardMaterial({color:0x65975e,roughness:1}),650);
+ const dummy=new THREE.Object3D();let grassSeed=91823;
+ function gr(){grassSeed=(Math.imul(grassSeed,1664525)+1013904223)>>>0;return grassSeed/4294967296}
+ for(let i=0;i<650;i++){dummy.position.set(-11.3+gr()*22.5,.08,4.65+gr()*10.5);dummy.rotation.y=gr()*6.28;dummy.scale.set(.65+gr()*.8,.6+gr()*1.3,.65+gr()*.8);dummy.updateMatrix();grassBlades.setMatrixAt(i,dummy.matrix)}
+ grassBlades.instanceMatrix.needsUpdate=true;scene.add(grassBlades);
  const dog=new THREE.Group();scene.add(dog);
 const fur=mat(0xc98c57),lightFur=mat(0xffd5a1),inner=mat(0xe89782),nose=mat(0x332a29),eye=mat(0x1e221c);
 sphere(.68,fur,0,.73,-.15,.92,.68,1.32,dog);
@@ -398,6 +429,45 @@ function showPanel(mode){
 $("#journal").onclick=()=>showPanel("journal");
 $("#personality").onclick=()=>showPanel("personality");
 $("#panelClose").onclick=()=>$("#panel").classList.remove("open");
+ // Original, synthesized ambient soundtrack and animal/environment effects.
+ // iOS Safari requires a user gesture to start or resume AudioContext.
+ let audioCtx=null,audioOn=false,musicTimer=0,nextBark=0,nextBird=0;
+ const audioButton=$("#sound");
+ function tone(freq,start,duration,volume=.03,type="sine",pan=0){
+   if(!audioCtx||!audioOn)return;
+   const osc=audioCtx.createOscillator(),gain=audioCtx.createGain(),stereo=audioCtx.createStereoPanner();
+   osc.type=type;osc.frequency.setValueAtTime(Math.max(30,freq),start);
+   gain.gain.setValueAtTime(.0001,start);gain.gain.exponentialRampToValueAtTime(Math.max(.0002,volume),start+.025);
+   gain.gain.exponentialRampToValueAtTime(.0001,start+duration);
+   stereo.pan.value=pan;osc.connect(gain).connect(stereo).connect(audioCtx.destination);
+   osc.start(start);osc.stop(start+duration+.02);
+ }
+ function bark(){
+   if(!audioCtx||!audioOn)return;
+   const t=audioCtx.currentTime;
+   for(let k=0;k<2;k++){const start=t+k*.19;tone(145,start,.16,.085,"sawtooth",-.1);tone(93,start+.015,.15,.045,"triangle",-.1)}
+ }
+ function birds(){
+   if(!audioCtx||!audioOn)return;
+   const t=audioCtx.currentTime;
+   for(let i=0;i<4;i++)tone(1350+i*170,t+i*.11,.12,.009,"sine",.65);
+ }
+ function soundtrack(){
+   if(!audioCtx||!audioOn)return;
+   const now=audioCtx.currentTime;
+   const chords=[[196,246.94,293.66],[174.61,220,261.63],[164.81,196,246.94],[146.83,196,246.94]];
+   const chord=chords[Math.floor(musicTimer/4)%chords.length];
+   for(let j=0;j<3;j++)tone(chord[j],now+j*.025,3.2,.009,"sine",j===0?-.3:j===2?.3:0);
+   for(let j=0;j<4;j++)tone(chord[j%3]*2,now+j*.78,.5,.005,"triangle",0);
+   musicTimer++;
+ }
+ audioButton.onclick=async()=>{
+   if(!audioCtx){audioCtx=new (window.AudioContext||window.webkitAudioContext)()}
+   await audioCtx.resume();audioOn=!audioOn;
+   audioButton.textContent=audioOn?"🔊 Sonido":"🔇 Sonido";
+   if(audioOn){soundtrack();nextBird=performance.now()+4500;nextBark=performance.now()+8000}
+ };
+
 let following=true,azimuth=.58,elevation=.69,radius=23;
 const focus=new THREE.Vector3(-.3,0,0),clock=new THREE.Clock();
 $("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
@@ -427,6 +497,7 @@ function completed(){
  for(const c of state.creations){if(!c.drawn){c.drawn=true;drawCreation(c)}}
  save();
  moving=false;nextAt=performance.now()+(4000+rand()*5000);
+  if(audioOn&&(current.id==="jugar"||current.id==="explorar")&&rand()<.35)bark();
 }
 if(state.position)dog.position.set(state.position.x,.05,state.position.z);
  if(!clearAt(dog.position.x,dog.position.z)){const safe=nearest(dog.position.x,dog.position.z);dog.position.set(safe.x,.05,safe.z)}
@@ -436,8 +507,9 @@ let frame=0;
 function animate(){
  requestAnimationFrame(animate);
  const dt=Math.min(clock.getDelta(),.04);frame+=dt;
+  if(audioOn&&audioCtx){if(audioCtx.state==="running"&&performance.now()>nextBird){birds();nextBird=performance.now()+10000+Math.random()*12000}if(performance.now()>nextBark){if(Math.random()<.35)bark();nextBark=performance.now()+16000+Math.random()*16000}if(!animate.nextMusic||performance.now()>animate.nextMusic){soundtrack();animate.nextMusic=performance.now()+3400}}
  const hour=new Date().getHours();const night=hour<7||hour>19;
- sun.intensity=night?1.2:2.5;ambient.intensity=night?1.4:2.4;
+ sun.intensity=night?.75:2.3;ambient.intensity=night?1.05:1.85;windowGlow.intensity=night?2.2:.5;
  if(!moving&&performance.now()>nextAt)startNew();
  let speed=0;
  if(moving){
