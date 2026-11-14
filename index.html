@@ -71,7 +71,10 @@ const spots={
  patio:{x:-1.2,z:7.3,label:"Jardín"},
  sofa:{x:-4.7,z:-1.35,label:"Junto al sofá"},
  caja:{x:-4.1,z:2.45,label:"Rincón de juguetes"},
- arbol:{x:3.4,z:8.6,label:"Bajo el árbol"}
+ arbol:{x:3.4,z:8.6,label:"Bajo el árbol"},
+ biblioteca:{x:-8.2,z:-5.6,label:"Biblioteca"},
+ estudio:{x:8.4,z:-5.6,label:"Estudio"},
+ comedor:{x:8.3,z:-1.4,label:"Comedor"}
 };
 const behaviours=[
  {id:"explorar",name:"Explorando rincones",place:"patio",weight:3},
@@ -80,7 +83,10 @@ const behaviours=[
  {id:"ordenar",name:"Llevando juguetes",place:"caja",weight:2},
  {id:"esconder",name:"Buscando un escondite",place:"sofa",weight:2},
  {id:"descansar",name:"Descansando",place:"cuarto",weight:2},
- {id:"jardin",name:"Explorando las plantas",place:"arbol",weight:2}
+ {id:"jardin",name:"Explorando las plantas",place:"arbol",weight:2},
+ {id:"leer",name:"Olfateando la biblioteca",place:"biblioteca",weight:1},
+ {id:"estudio",name:"Curioseando el estudio",place:"estudio",weight:1},
+ {id:"comedor",name:"Inspeccionando el comedor",place:"comedor",weight:1}
 ];
 function choose(){
  let weighted=[];
@@ -175,9 +181,11 @@ const tile=new THREE.GridHelper(11.8,12,0xe4c39e,0xe4c39e);tile.position.set(-.0
 // Open-front dollhouse walls and three cozy rooms.
 box(.18,3.1,15.5,M.wall,-11.9,1.55,-2.7);
 box(23.8,3.1,.18,M.wall,-.07,1.55,-10.45);
-box(5.45,2.4,.16,M.wall,3.1,1.2,.05);
-box(.14,2.4,2.4,M.wall,.05,1.2,-3.12);
-box(.14,2.4,2.4,M.wall,.05,1.2,2.95);
+// Bedroom / kitchen partition with a real doorway at x=2.5.
+ box(1.25,2.65,.18,M.wall,.72,1.325,.05);
+ box(2.55,2.65,.18,M.wall,4.55,1.325,.05);
+box(.16,2.65,2.8,M.wall,.05,1.325,-2.95);
+box(.16,2.65,2.0,M.wall,.05,1.325,3.25);
 box(3.0,.22,.12,M.wood,-3.9,2.34,-4.24);
 box(3.4,.16,.11,M.wood,3.1,2.34,-4.24);
 box(1.4,1.25,.08,M.blue,-3.7,1.45,-4.24,false);
@@ -252,6 +260,67 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  for(const z of [-10.3,-4.35])box(23.4,.13,.13,oak,0,.12,z);
  const fill=new THREE.PointLight(0xffd7a2,1.8,12,2);fill.position.set(-8,2.7,-6);scene.add(fill);
  const fill2=new THREE.PointLight(0xffe1b6,1.8,12,2);fill2.position.set(8.5,2.7,-6);scene.add(fill2);
+
+ 
+ // Clearly separated rooms with walkable 2.2m door openings.
+ // Left wing: library, right wing: studio and dining room.
+ function partitionX(x,z1,z2){box(.17,2.65,z2-z1,M.wall,x,1.325,(z1+z2)/2)}
+ function partitionZ(z,x1,x2){box(x2-x1,2.65,.17,M.wall,(x1+x2)/2,1.325,z)}
+ partitionX(-5.95,-10.35,-6.7);partitionX(-5.95,-4.45,3.95);
+ partitionX(5.95,-10.35,-6.7);partitionX(5.95,-4.45,3.95);
+ partitionZ(-4.45,6.0,7.4);partitionZ(-4.45,9.7,11.7);
+ // Kitchen/sitting room boundary and accessible exit to the garden.
+ partitionZ(4.2,-11.7,-1.7);partitionZ(4.2,1.1,11.7);
+ // Room-specific visual accents.
+ box(3.2,.12,1.5,linen,-8.6,.09,-6.1,false);
+ box(2.7,.11,1.7,linen,8.4,.09,-6.3,false);
+ // Navigation uses these exact wall and furniture footprints, not visual-only collision.
+ const blockers=[];
+ const block=(x,z,w,d)=>blockers.push({x1:x-w/2,x2:x+w/2,z1:z-d/2,z2:z+d/2});
+ // Outer boundaries and room partitions (door gaps intentionally omitted).
+ block(-11.9,-2.7,.18,15.5);block(11.8,-5.45,.17,9.6);
+ block(0,-10.45,23.8,.18);
+ block(-5.95,-8.525,.17,3.65);block(-5.95,-.25,.17,8.4);
+ block(5.95,-8.525,.17,3.65);block(5.95,-.25,.17,8.4);
+ block(8.85,-4.45,2.9,.17);
+ block(-6.7,4.2,10,.17);block(6.4,4.2,10.6,.17);
+ block(.72,.05,1.25,.18);block(4.55,.05,2.55,.18);
+ block(.05,-2.95,.16,2.8);block(.05,3.25,.16,2);
+ // Living room furniture, kitchen, bedroom, library, studio, dining.
+ [[-3.8,-2.4,3.1,1.3],[-2.75,.3,1.85,1.1],[-4.7,2.56,1.2,1],
+ [2.4,3.45,4.6,.9],[4.25,1.18,1.2,1],[2.4,-2.68,2.8,2],
+ [4.45,-3.44,1,.8],[-8.5,-6.3,1.85,1.8],[-8.9,-9.35,4.7,.6],
+ [8.8,-8.2,3.3,1.3],[8.85,-6.6,1.5,1.1],[8.35,-2.45,3.0,2.0],
+ [10.5,-5.7,1.1,1.1],[-3.2,6.5,2,.8]].forEach(a=>block(...a));
+ const DOG_RADIUS=.31,GRID=.48;
+ function clearAt(x,z){
+   if(x< -11.45||x>11.35||z< -10.1||z>15.4)return false;
+   for(const b of blockers)if(x>b.x1-DOG_RADIUS&&x<b.x2+DOG_RADIUS&&z>b.z1-DOG_RADIUS&&z<b.z2+DOG_RADIUS)return false;
+   return true;
+ }
+ // A* navigation on a stable grid. No furniture/wall clipping, including between rooms.
+ const gx=x=>Math.round((x+11.4)/GRID),gz=z=>Math.round((z+10)/GRID);
+ const wx=i=>i*GRID-11.4,wz=j=>j*GRID-10;
+ const nearest=(x,z)=>{let a={x:wx(gx(x)),z:wz(gz(z))};if(clearAt(a.x,a.z))return a;
+   for(let k=1;k<24;k++)for(let dx=-k;dx<=k;dx++)for(let dz=-k;dz<=k;dz++){let xx=wx(gx(x)+dx),zz=wz(gz(z)+dz);if(clearAt(xx,zz))return {x:xx,z:zz}}return {x:0,z:1};};
+ function route(from,to){
+   const a=nearest(from.x,from.z),b=nearest(to.x,to.z);
+   const sx=gx(a.x),sz=gz(a.z),tx=gx(b.x),tz=gz(b.z);
+   const key=(x,z)=>x+":"+z,origin=key(sx,sz),goal=key(tx,tz);
+   const open=[{x:sx,z:sz,g:0,f:Math.abs(sx-tx)+Math.abs(sz-tz)}],best=new Map([[origin,0]]),parent=new Map(),closed=new Set();
+   for(let n=0;open.length&&n<5500;n++){
+     let m=0;for(let i=1;i<open.length;i++)if(open[i].f<open[m].f)m=i;
+     const v=open.splice(m,1)[0],id=key(v.x,v.z);if(closed.has(id))continue;
+     if(id===goal){const path=[];let p=id;while(p!==origin){const [x,z]=p.split(":").map(Number);path.push({x:wx(x),z:wz(z)});p=parent.get(p);if(!p)break}return path.reverse()}
+     closed.add(id);
+     for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]]){
+       const x=v.x+dx,z=v.z+dz,k=key(x,z),g=v.g+1;
+       if(closed.has(k)||!clearAt(wx(x),wz(z))||g>=(best.get(k)??Infinity))continue;
+       best.set(k,g);parent.set(k,id);open.push({x,z,g,f:g+Math.abs(x-tx)+Math.abs(z-tz)});
+     }
+   }
+   return [];
+ }
 
  const dog=new THREE.Group();scene.add(dog);
 const fur=mat(0xc98c57),lightFur=mat(0xffd5a1),inner=mat(0xe89782),nose=mat(0x332a29),eye=mat(0x1e221c);
@@ -346,10 +415,11 @@ canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel"
 canvas.addEventListener("dblclick",()=>{following=true;$("#follow").textContent="✦ Seguir a Milo"});
  canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(3.5,Math.min(48,radius+Math.sign(e.deltaY)*.85))},{passive:false});
 let current=choose(),nextAt=performance.now(),lastSave=performance.now(),moving=true;
-let dogTarget=spots[current.place];
+let dogTarget=spots[current.place],waypoints=[];
+ function plan(){waypoints=route(dog.position,dogTarget);if(waypoints.length===0){dogTarget=nearest(dog.position.x,dog.position.z)}}
 updateLabel(current);
 function startNew(){
- current=choose();dogTarget=spots[current.place];moving=true;updateLabel(current);
+ current=choose();dogTarget=spots[current.place];moving=true;plan();updateLabel(current);
 }
 function completed(){
  apply(current,Date.now(),false);
@@ -359,6 +429,8 @@ function completed(){
  moving=false;nextAt=performance.now()+(4000+rand()*5000);
 }
 if(state.position)dog.position.set(state.position.x,.05,state.position.z);
+ if(!clearAt(dog.position.x,dog.position.z)){const safe=nearest(dog.position.x,dog.position.z);dog.position.set(safe.x,.05,safe.z)}
+ plan();
 $("#load").remove();
 let frame=0;
 function animate(){
@@ -369,10 +441,12 @@ function animate(){
  if(!moving&&performance.now()>nextAt)startNew();
  let speed=0;
  if(moving){
-  const dx=dogTarget.x-dog.position.x,dz=dogTarget.z-dog.position.z,dist=Math.hypot(dx,dz);
-  if(dist<.13)completed();else{
+  const waypoint=waypoints[0]||dogTarget;
+   const dx=waypoint.x-dog.position.x,dz=waypoint.z-dog.position.z,dist=Math.hypot(dx,dz);
+  if(dist<.13){if(waypoints.length)waypoints.shift();else completed()}else{
    speed=Math.min(1,dist*2);
-   const step=Math.min(dist,dt*1.35);dog.position.x+=dx/dist*step;dog.position.z+=dz/dist*step;
+   const step=Math.min(dist,dt*1.35),nx=dog.position.x+dx/dist*step,nz=dog.position.z+dz/dist*step;
+    if(clearAt(nx,nz)){dog.position.x=nx;dog.position.z=nz}else{plan();if(!waypoints.length){moving=false;nextAt=performance.now()+1200}}
    let heading=Math.atan2(dx,dz);
    dog.rotation.y+=Math.atan2(Math.sin(heading-dog.rotation.y),Math.cos(heading-dog.rotation.y))*Math.min(1,dt*8);
   }
