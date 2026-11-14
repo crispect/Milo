@@ -23,12 +23,21 @@ jobs:
     steps:
       - name: Descargar código
         uses: actions/checkout@v4
+      - name: Preparar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Verificar sintaxis, navegación y persistencia
+        run: npm ci --ignore-scripts --no-audit --no-fund && npm test
+      - name: Preparar archivos públicos
+        run: mkdir -p _site && cp index.html _site/index.html
       - name: Preparar GitHub Pages
         uses: actions/configure-pages@v5
       - name: Empaquetar sitio
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
       - name: Publicar sitio
         id: deployment
         uses: actions/deploy-pages@v4

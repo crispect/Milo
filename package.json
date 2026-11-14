@@ -1,0 +1,9 @@
+{
+  "name": "milo-stability-checks",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node scripts/check-syntax.mjs && node --test tests/runtime.test.mjs"
+  },
+  "devDependencies": {"three": "0.161.0"}
+}
