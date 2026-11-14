@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#172b2d">
+<title>Milo · Una vida propia</title>
+<style>
+:root{color-scheme:dark;--paper:#f4e9d4;--ink:#153133;--sub:#9db3ae;--glass:rgba(18,38,40,.87)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#a4cfbd;color:white}
+#scene{position:fixed;inset:0;touch-action:none}canvas{display:block;touch-action:none}
+#shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,27,28,.45),transparent 25%,transparent 65%,rgba(10,27,28,.34))}
+header{position:fixed;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:max(18px,env(safe-area-inset-top)) 20px 0;pointer-events:none}
+.logo{font-size:29px;font-weight:850;letter-spacing:-1.5px;line-height:1}.tag{color:#eef4df;font-size:11px;font-weight:550;letter-spacing:2.1px;text-transform:uppercase;margin-top:6px}
+.pill{border-radius:20px;background:var(--glass);box-shadow:0 10px 30px #0003;padding:10px 13px;font-size:12px;line-height:1.35;text-align:right;max-width:44%;backdrop-filter:blur(15px)}
+.pill strong{display:block;font-size:14px;color:#fff1c4}
+#bottom{position:fixed;bottom:calc(16px + env(safe-area-inset-bottom));left:16px;right:16px;display:flex;flex-direction:column;align-items:center;gap:10px;pointer-events:none}
+#thought{padding:10px 17px;background:#fff9e9;color:var(--ink);border-radius:19px;font-size:13px;font-weight:650;box-shadow:0 5px 25px #0003;max-width:92%;text-align:center}
+.actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;pointer-events:auto}
+button{appearance:none;border:0;border-radius:50px;background:var(--glass);color:#f3f2e8;font:700 13px -apple-system,BlinkMacSystemFont,sans-serif;padding:13px 17px;backdrop-filter:blur(18px);box-shadow:0 8px 24px #0003;cursor:pointer}
+button.primary{background:#f5c96e;color:#28382d}
+button:focus-visible{outline:3px solid #fff}
+#hint{font-size:11px;color:#eef5e9;text-shadow:0 1px 5px #203536}
+#panel{position:fixed;inset:0 0 0 auto;width:min(420px,100%);background:#173437ed;backdrop-filter:blur(24px);padding:calc(26px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));transform:translateX(103%);transition:transform .22s ease;box-shadow:-15px 0 50px #0005;overflow:auto;z-index:3}
+#panel.open{transform:translateX(0)}#panelClose{float:right;padding:8px 14px;background:#ffffff24;font-size:19px}
+#panel h2{margin:5px 0 8px;font-size:29px;letter-spacing:-.7px}#panel h3{color:#ffd48a;font-size:14px;margin:26px 0 10px}#panel p{color:#d8e7df;line-height:1.55;font-size:14px}
+.event{background:#ffffff0b;padding:12px 14px;margin:8px 0;border:1px solid #ffffff13;border-radius:15px;font-size:13px;line-height:1.5}
+.event small{display:block;color:#b9ccc7;margin-bottom:5px;font-size:11px}
+.stat{display:flex;justify-content:space-between;gap:14px;margin:15px 0;font-size:14px}.stat b{color:#fbd38f}.track{height:5px;background:#ffffff24;border-radius:8px;margin-top:7px;overflow:hidden}.fill{height:100%;background:#eac57a;border-radius:8px}
+#load{position:fixed;inset:0;display:grid;place-items:center;background:#23474b;z-index:5;text-align:center;padding:30px}
+#load .big{font-size:48px}#load p{opacity:.8;max-width:340px;line-height:1.5}
+#load button{margin-top:14px;background:#f4ca70;color:#1b302f}
+@media(min-width:700px){header{padding:24px 32px}#bottom{bottom:26px}.logo{font-size:34px}.pill{max-width:310px}}
+</style>
+</head>
+<body>
+<div id="scene"></div><div id="shade"></div>
+<header><div><div class="logo">Milo <span style="font-size:20px">🐾</span></div><div class="tag">Una vida propia</div></div><div class="pill"><strong id="day">Día 1</strong><span id="where">En casa · explorando</span></div></header>
+<div id="bottom"><div id="thought">Milo está descubriendo su hogar…</div><div class="actions"><button class="primary" id="follow">✦ Seguir a Milo</button><button id="journal">📖 Diario</button><button id="personality">♡ Personalidad</button></div><div id="hint">Desliza para girar · Pellizca para acercar</div></div>
+<aside id="panel" aria-label="Información de Milo"><button id="panelClose" aria-label="Cerrar">×</button><h2 id="panelTitle">Diario</h2><div id="panelContent"></div></aside>
+<div id="load"><div><div class="big">🐕</div><h2>La casa de Milo</h2><p>Preparando un pequeño mundo independiente…</p><div id="loadError"></div></div></div>
+<script type="module">
+try {
+const THREE = await import("https://cdn.jsdelivr.net/npm/three@0.161.0/build/three.module.js");
+const $ = s => document.querySelector(s);
+const KEY = "milo-life-v1";
+const NOW = Date.now();
+function randomSeed(){return Math.floor(Math.random()*2147483646)+1}
+function newState(){
+ return {version:1,born:NOW,lastSim:NOW,lastVisit:null,seed:randomSeed(),energy:74,mood:72,
+ traits:{curiosidad:68,creatividad:45,sociabilidad:52,valentia:55,paciencia:49,orden:39},
+ toys:["pelota roja","hueso de tela","peluche"],fav:"pelota roja",progress:{gather:0,hide:0,garden:0,rest:0},
+ creations:[],events:[],action:"explorar",position:{x:-2.5,z:0.6}};
+}
+let state;
+try {state=JSON.parse(localStorage.getItem(KEY));if(!state||state.version!==1)throw Error("version");}catch(e){state=newState()}
+const oldVisit = state.lastVisit;
+function rand(){state.seed=(Math.imul(state.seed,1664525)+1013904223)>>>0;return state.seed/4294967296}
+function pick(a){return a[Math.floor(rand()*a.length)]}
+function clamp(v){return Math.max(5,Math.min(95,v))}
+function log(message,kind,t){state.events.push({message,kind,t});if(state.events.length>500)state.events.splice(0,state.events.length-500)}
+function creation(kind,title,x,z,t){
+ if(state.creations.some(c=>c.kind===kind))return false;
+ state.creations.push({kind,title,x,z,t});
+ log(title, "creacion",t);return true;
+}
+const spots={
+ sala:{x:-2.8,z:0.3,label:"Sala de estar"},
+ cocina:{x:2.45,z:2.2,label:"Cocina"},
+ cuarto:{x:2.3,z:-2.1,label:"Dormitorio"},
+ patio:{x:-1.2,z:7.3,label:"Jardín"},
+ sofa:{x:-4.7,z:-1.35,label:"Junto al sofá"},
+ caja:{x:-4.1,z:2.45,label:"Rincón de juguetes"},
+ arbol:{x:3.4,z:8.6,label:"Bajo el árbol"}
+};
+const behaviours=[
+ {id:"explorar",name:"Explorando rincones",place:"patio",weight:3},
+ {id:"jugar",name:"Jugando con su pelota",place:"sala",weight:3},
+ {id:"investigar",name:"Investigando un olor",place:"cocina",weight:2},
+ {id:"ordenar",name:"Llevando juguetes",place:"caja",weight:2},
+ {id:"esconder",name:"Buscando un escondite",place:"sofa",weight:2},
+ {id:"descansar",name:"Descansando",place:"cuarto",weight:2},
+ {id:"jardin",name:"Explorando las plantas",place:"arbol",weight:2}
+];
+function choose(){
+ let weighted=[];
+ for(const b of behaviours){
+  let w=b.weight;
+  if(b.id==="descansar")w=state.energy<35?12:state.energy<55?4:1;
+  if(b.id==="explorar"||b.id==="jardin")w+=Math.round(state.traits.curiosidad/35);
+  if(b.id==="ordenar")w+=Math.floor(state.traits.orden/45);
+  for(let i=0;i<w;i++)weighted.push(b);
+ }
+ return pick(weighted);
+}
+function apply(b,t,offline){
+ state.action=b.id;
+ const p=spots[b.place];state.position={x:p.x,z:p.z};
+ if(b.id==="descansar"){
+  state.energy=Math.min(100,state.energy+26);state.progress.rest++;
+  if(state.progress.rest===5){creation("nido","Milo acomodó un rincón de descanso con sus mantitas.",2.9,-2.8,t)}
+  if(rand()<.21)log("Tomó una siesta tranquila en su dormitorio.","rutina",t);
+ }else{
+  state.energy=Math.max(9,state.energy-(5+rand()*10));
+  if(b.id==="jugar"){
+   state.mood=Math.min(95,state.mood+5);
+   if(rand()<.4)log("Jugó durante un buen rato con su "+state.fav+".","juego",t);
+  }
+  if(b.id==="investigar"){
+   state.traits.curiosidad=clamp(state.traits.curiosidad+.12);
+   if(rand()<.25)log("Inspeccionó con atención los aromas de la cocina.","descubrimiento",t);
+  }
+  if(b.id==="explorar"){
+   state.traits.valentia=clamp(state.traits.valentia+.06);
+   if(rand()<.22)log("Exploró el patio y volvió a sus rincones conocidos.","exploracion",t);
+  }
+  if(b.id==="ordenar"){
+   state.progress.gather++;state.traits.orden=clamp(state.traits.orden+.2);
+   if(state.progress.gather===3)creation("coleccion","Reunió sus juguetes favoritos en un rincón de la sala.",-4.1,2.4,t);
+   else if(rand()<.22)log("Movió un juguete hacia su rincón favorito.","habito",t);
+  }
+  if(b.id==="esconder"){
+   state.progress.hide++;state.traits.creatividad=clamp(state.traits.creatividad+.18);
+   if(state.progress.hide===4)creation("escondite","Preparó un escondite para su pelota cerca del sofá.",-4.8,-1.5,t);
+   else if(rand()<.25)log("Intentó ocultar la pelota detrás de un mueble.","habito",t);
+  }
+  if(b.id==="jardin"){
+   state.progress.garden++;state.traits.curiosidad=clamp(state.traits.curiosidad+.08);
+   if(state.progress.garden===6)creation("sendero","Marcó un sendero habitual entre el árbol y la puerta.",1.1,6.5,t);
+   else if(rand()<.22)log("Descubrió una zona del jardín que le gusta olfatear.","descubrimiento",t);
+  }
+ }
+ if(state.energy<22 && b.id!=="descansar")state.mood=Math.max(25,state.mood-2);
+ if(!offline && rand()<.13)log("Hoy parece especialmente contento en casa.","animo",t);
+}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state))}catch(e){}}
+function advanceOffline(){
+ const maxEvents=800, step=3*60*60*1000;
+ let count=Math.min(maxEvents,Math.floor(Math.max(0,NOW-state.lastSim)/step));
+ let start=NOW-count*step;
+ for(let i=0;i<count;i++){const b=choose();apply(b,start+(i+1)*step,true)}
+ state.lastSim=NOW;
+}
+advanceOffline();
+const summary=oldVisit?state.events.filter(e=>e.t>oldVisit):[];
+state.lastVisit=NOW;save();
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa6c8b5);
+scene.fog=new THREE.Fog(0xa6c8b5,25,60);
+const camera=new THREE.PerspectiveCamera(47,innerWidth/innerHeight,.1,120);
+const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.8));
+renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.outputColorSpace=THREE.SRGBColorSpace;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.47;
+$("#scene").appendChild(renderer.domElement);
+const ambient=new THREE.HemisphereLight(0xfff5da,0x667c67,2.4);scene.add(ambient);
+const sun=new THREE.DirectionalLight(0xffe3b3,2.5);sun.position.set(-5,13,10);sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-18;sun.shadow.camera.right=18;
+sun.shadow.camera.top=18;sun.shadow.camera.bottom=-18;sun.shadow.normalBias=.035;scene.add(sun);
+function mat(color,roughness=1){return new THREE.MeshStandardMaterial({color,roughness})}
+const M={
+ earth:mat(0x81a36f),grass:mat(0x86b57b),wall:mat(0xe9dcc8),wood:mat(0xb8845e),
+ plank:mat(0xbca381),cream:mat(0xf6e9d1),floor:mat(0xeac9a4),
+ white:mat(0xfff2e3),dark:mat(0x27312b),rose:mat(0xce8b81),leaf:mat(0x458e61),
+ sofa:mat(0x769b8c),gold:mat(0xe3b453),blue:mat(0x8abdbb),red:mat(0xb9564c)
+};
+function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;scene.add(o);return o}
+function sphere(r,m,x,y,z,sx=1,sy=1,sz=1,parent=scene){const o=new THREE.Mesh(new THREE.SphereGeometry(r,16,12),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
+function cylinder(r1,r2,h,m,x,y,z,parent=scene){const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,12),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o}
+box(40,.3,40,M.earth,0,-.24,0,false);
+box(11.8,.12,8.7,M.floor,-.08,-.035,0,false);
+box(11.8,.1,8,M.grass,-.08,-.04,8.2,false);
+const tile=new THREE.GridHelper(11.8,12,0xe4c39e,0xe4c39e);tile.position.set(-.08,.04,0);tile.material.opacity=.2;tile.material.transparent=true;scene.add(tile);
+// Open-front dollhouse walls and three cozy rooms.
+box(.18,2.45,8.7,M.wall,-5.9,1.2,0);
+box(11.8,2.45,.18,M.wall,-.07,1.2,-4.35);
+box(5.45,2.4,.16,M.wall,3.1,1.2,.05);
+box(.14,2.4,2.4,M.wall,.05,1.2,-3.12);
+box(.14,2.4,2.4,M.wall,.05,1.2,2.95);
+box(3.0,.22,.12,M.wood,-3.9,2.34,-4.24);
+box(3.4,.16,.11,M.wood,3.1,2.34,-4.24);
+box(1.4,1.25,.08,M.blue,-3.7,1.45,-4.24,false);
+box(1.1,.06,.1,M.white,-3.7,.78,-4.16);
+// Rug
+const rug=new THREE.Mesh(new THREE.CircleGeometry(2.15,36),mat(0xd7a989));
+rug.rotation.x=-Math.PI/2;rug.scale.set(1.45,.9,1);rug.position.set(-2.7,.035,.75);scene.add(rug);
+// Sofa and table
+box(2.8,.55,1.14,M.sofa,-3.8,.34,-2.4);box(2.8,.86,.26,M.sofa,-3.8,.78,-2.96);
+box(.3,.6,1.13,M.sofa,-5.25,.52,-2.38);box(.3,.6,1.13,M.sofa,-2.35,.52,-2.38);
+box(1.6,.19,.92,M.wood,-2.75,.43,.3);
+for(const x of [-3.35,-2.15])for(const z of [-.01,.58])box(.12,.36,.12,M.dark,x,.24,z);
+sphere(.18,M.red,-2.5,.23,1.85);sphere(.17,M.gold,-3.15,.22,2.2);
+box(1.1,.45,.9,M.wood,-4.7,.25,2.56);
+// Kitchen
+box(4.5,.8,.7,M.white,2.4,.43,3.45);box(1.05,1.7,.83,M.cream,4.25,.87,1.18);
+box(1.0,.12,.65,M.wood,1.05,.88,3.45);
+box(1.22,.07,.7,M.wood,2.55,.86,3.45);
+for(let i=0;i<4;i++)cylinder(.11,.11,.015,M.dark,1.98+(i%2)*.32,.92,3.25+Math.floor(i/2)*.3);
+cylinder(.33,.31,.17,M.blue,3,.12,1.16);
+cylinder(.25,.24,.13,M.gold,3,.23,1.16);
+// Bedroom
+box(2.6,.38,1.75,M.wood,2.4,.26,-2.68);
+box(2.4,.2,1.58,M.cream,2.4,.54,-2.68);
+box(1.75,.12,.95,M.blue,2.25,.68,-2.9);
+box(.95,.2,.6,M.white,3.08,.7,-2.8);
+box(.9,.7,.65,M.wood,4.45,.35,-3.44);
+sphere(.35,M.rose,1.1,.33,-.83,1,.35,1.2);
+// Yard details
+function tree(x,z,scale){cylinder(.21*scale,.27*scale,2.25*scale,M.wood,x,1.05*scale,z);sphere(1.1*scale,M.leaf,x,2.6*scale,z,1,1.15,1);sphere(.74*scale,mat(0x64a777),x-.65*scale,2.9*scale,z+.3*scale)}
+tree(4.1,9.8,1);tree(-4.5,10.2,.85);
+for(let i=0;i<26;i++){
+ const x=-5.2+rand()*10.3,z=4.75+rand()*6.7;
+ if(Math.abs(x-1)<1.9&&z<8)continue;
+ sphere(.075+rand()*.045,i%3===0?M.rose:i%3===1?M.gold:M.white,x,.08,z,1,.6,1);
+}
+box(1.8,.17,.65,M.wood,-3.2,.4,6.5);
+for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
+const dog=new THREE.Group();scene.add(dog);
+const fur=mat(0xc98c57),lightFur=mat(0xffd5a1),inner=mat(0xe89782),nose=mat(0x332a29),eye=mat(0x1e221c);
+sphere(.68,fur,0,.73,-.15,.92,.68,1.32,dog);
+sphere(.44,lightFur,0,.52,.36,1,.68,1.02,dog);
+sphere(.47,fur,0,1.04,.68,1.05,1,1.02,dog);
+sphere(.31,lightFur,0,.82,1.03,1.08,.65,.85,dog);
+sphere(.095,nose,0,.88,1.29,1,.7,.85,dog);
+for(const side of [-1,1]){
+ const ear=new THREE.Mesh(new THREE.ConeGeometry(.22,.56,4),fur);
+ ear.position.set(side*.32,1.56,.52);ear.rotation.z=-side*.16;ear.rotation.y=Math.PI/4;ear.castShadow=true;dog.add(ear);
+ sphere(.075,eye,side*.22,1.16,1.04,1,1,1,dog);
+ sphere(.027,M.white,side*.205,1.195,1.10,1,1,1,dog);
+}
+const legs=[];
+for(const side of [-1,1])for(const back of [-1,1]){
+ const pivot=new THREE.Group();pivot.position.set(side*.4,.51,back*.51);dog.add(pivot);
+ sphere(.19,fur,0,-.18,.03,1,.95,1,pivot);
+ sphere(.18,lightFur,0,-.35,.12,1,.6,1.2,pivot);
+ legs.push({pivot,side,back});
+}
+const tail=new THREE.Group();tail.position.set(0,.93,-.88);dog.add(tail);sphere(.24,fur,0,.06,-.18,.58,.58,1.3,tail);
+const creatureMeshes=[];
+function drawCreation(c){
+ const g=new THREE.Group();g.position.set(c.x,0,c.z);scene.add(g);
+ const mk=(geometry,material,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);m.castShadow=true;g.add(m);return m};
+ if(c.kind==="coleccion"){
+  for(let i=0;i<5;i++)mk(new THREE.SphereGeometry(.12+i*.012,12,8),[M.red,M.gold,M.blue,M.rose,fur][i],Math.cos(i*1.25)*.42,.12,Math.sin(i*1.25)*.3);
+ }else if(c.kind==="escondite"){
+  mk(new THREE.BoxGeometry(.76,.12,.76),M.wood,0,.08,0);
+  for(const x of [-.31,.31])mk(new THREE.BoxGeometry(.12,.46,.72),M.wood,x,.27,0);
+  mk(new THREE.SphereGeometry(.15,12,9),M.red,0,.2,0);
+ }else if(c.kind==="nido"){
+  mk(new THREE.CylinderGeometry(.73,.73,.12,24),M.rose,0,.09,0);
+  for(let i=0;i<3;i++)mk(new THREE.SphereGeometry(.22,12,8),M.cream,Math.cos(i*2.1)*.3,.24,Math.sin(i*2.1)*.25);
+ }else if(c.kind==="sendero"){
+  for(let i=0;i<7;i++)mk(new THREE.CylinderGeometry(.2,.23,.045,8),M.floor,Math.sin(i*.4)*.3,.04,(i-3)*.5);
+ }
+ creatureMeshes.push(g);
+}
+state.creations.forEach(drawCreation);
+function date(t){return new Date(t).toLocaleString("es-CL",{weekday:"short",day:"numeric",month:"short",hour:"2-digit",minute:"2-digit"})}
+function days(){return Math.floor((Date.now()-state.born)/(24*60*60*1000))+1}
+function updateLabel(b){
+ $("#where").textContent=spots[b.place].label;
+ $("#day").textContent="Día "+days();
+ $("#thought").textContent="🐾 "+b.name;
+}
+function renderJournal(){
+ const all=state.events.slice().sort((a,b)=>b.t-a.t);
+ let h="<p>La historia de Milo continúa aunque no estés mirando. Los cambios quedan guardados en este navegador.</p>";
+ if(oldVisit){h+="<h3>Desde tu última visita · "+summary.length+" acontecimientos</h3>";
+ h+=summary.length?summary.slice().reverse().slice(0,22).map(e=>"<div class='event'><small>"+date(e.t)+"</small>"+e.message+"</div>").join(""):"<p>No hubo acontecimientos nuevos registrados. Puedes observarlo explorar en tiempo real.</p>";
+ }else{h+="<h3>¡Bienvenido a su primer día!</h3><p>Milo acaba de llegar. En sus próximas visitas encontrarás aquí lo que haya vivido.</p>"}
+ h+="<h3>Historia completa</h3>";
+ h+=all.length?all.slice(0,80).map(e=>"<div class='event'><small>"+date(e.t)+" · "+e.kind+"</small>"+e.message+"</div>").join(""):"<p>Todavía no tiene recuerdos importantes. Dale tiempo para descubrir la casa.</p>";
+ $("#panelContent").innerHTML=h;
+}
+function renderPersonality(){
+ let h="<p>Sus tendencias cambian lentamente según lo que hace. Milo nunca recibe órdenes del visitante.</p>";
+ for(const [k,v] of Object.entries(state.traits)){
+  h+="<div class='stat'><div style='flex:1'>"+k[0].toUpperCase()+k.slice(1)+"<div class='track'><div class='fill' style='width:"+v+"%'></div></div></div><b>"+Math.round(v)+"</b></div>";
+ }
+ h+="<h3>Estado actual</h3><p>Energía: "+Math.round(state.energy)+" / 100 · Ánimo: "+Math.round(state.mood)+" / 100</p>";
+ h+="<h3>Objetos que ha creado o reorganizado</h3>";
+ h+=state.creations.length?state.creations.map(c=>"<div class='event'><small>"+date(c.t)+"</small>"+c.title+"</div>").join(""):"<p>Por ahora conserva la casa como la encontró.</p>";
+ h+="<h3>Recuerdos</h3><p>Juguete preferido: "+state.fav+". Sus rutinas se construyen a partir de sus experiencias acumuladas.</p>";
+ $("#panelContent").innerHTML=h;
+}
+function showPanel(mode){
+ $("#panelTitle").textContent=mode==="journal"?"Diario de Milo":"Su personalidad";
+ mode==="journal"?renderJournal():renderPersonality();
+ $("#panel").classList.add("open");
+}
+$("#journal").onclick=()=>showPanel("journal");
+$("#personality").onclick=()=>showPanel("personality");
+$("#panelClose").onclick=()=>$("#panel").classList.remove("open");
+let following=true,azimuth=.58,elevation=.82,radius=17;
+const focus=new THREE.Vector3(-.3,0,2.2),clock=new THREE.Clock();
+$("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
+const canvas=renderer.domElement;
+const pointers=new Map();let pinchDist=0,oldPoint=null;
+canvas.addEventListener("pointerdown",e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId)});
+canvas.addEventListener("pointermove",e=>{
+ if(!pointers.has(e.pointerId))return;
+ const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(pointers.size===1){azimuth-=(e.clientX-old.x)*.006;elevation=Math.max(.3,Math.min(1.4,elevation+(e.clientY-old.y)*.004))}
+ else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y);if(pinchDist)radius=Math.max(7,Math.min(27,radius*pinchDist/d));pinchDist=d}
+});
+const end=e=>{pointers.delete(e.pointerId);pinchDist=0};
+canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);
+canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(6,Math.min(28,radius+Math.sign(e.deltaY)*.7))},{passive:false});
+let current=choose(),nextAt=performance.now(),lastSave=performance.now(),moving=true;
+let dogTarget=spots[current.place];
+updateLabel(current);
+function startNew(){
+ current=choose();dogTarget=spots[current.place];moving=true;updateLabel(current);
+}
+function completed(){
+ apply(current,Date.now(),false);
+ state.lastSim=Date.now();
+ for(const c of state.creations){if(!c.drawn){c.drawn=true;drawCreation(c)}}
+ save();
+ moving=false;nextAt=performance.now()+(4000+rand()*5000);
+}
+if(state.position)dog.position.set(state.position.x,.05,state.position.z);
+$("#load").remove();
+let frame=0;
+function animate(){
+ requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),.04);frame+=dt;
+ const hour=new Date().getHours();const night=hour<7||hour>19;
+ sun.intensity=night?1.2:2.5;ambient.intensity=night?1.4:2.4;
+ if(!moving&&performance.now()>nextAt)startNew();
+ let speed=0;
+ if(moving){
+  const dx=dogTarget.x-dog.position.x,dz=dogTarget.z-dog.position.z,dist=Math.hypot(dx,dz);
+  if(dist<.13)completed();else{
+   speed=Math.min(1,dist*2);
+   const step=Math.min(dist,dt*1.35);dog.position.x+=dx/dist*step;dog.position.z+=dz/dist*step;
+   let heading=Math.atan2(dx,dz);
+   dog.rotation.y+=Math.atan2(Math.sin(heading-dog.rotation.y),Math.cos(heading-dog.rotation.y))*Math.min(1,dt*8);
+  }
+ }
+ for(let i=0;i<legs.length;i++)legs[i].pivot.rotation.x=Math.sin(frame*11+(i%2)*Math.PI+(i<2?0:Math.PI))*.45*speed;
+ tail.rotation.y=Math.sin(frame*10)*.5;
+ dog.position.y=.06+Math.abs(Math.sin(frame*11))*.04*speed;
+ if(following){focus.x+=(dog.position.x-focus.x)*dt*1.8;focus.z+=(dog.position.z-focus.z)*dt*1.8}
+ const length=radius;camera.position.set(focus.x+Math.sin(azimuth)*Math.cos(elevation)*length,Math.sin(elevation)*length+1.2,focus.z+Math.cos(azimuth)*Math.cos(elevation)*length);
+ camera.lookAt(focus.x,0,focus.z);
+ renderer.render(scene,camera);
+ if(performance.now()-lastSave>5000){state.lastSim=Date.now();save();lastSave=performance.now()}
+}
+animate();
+window.addEventListener("resize",()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+document.addEventListener("visibilitychange",()=>{if(document.hidden){state.lastSim=Date.now();save()}});
+window.addEventListener("pagehide",()=>{state.lastSim=Date.now();save()});
+}catch(error){
+ document.querySelector("#loadError").innerHTML="<p>No fue posible iniciar el motor 3D. Abre esta página en Safari, con conexión a internet, y vuelve a cargar.</p><p style='font-size:11px'>"+String(error.message||error)+"</p><button onclick='location.reload()'>Reintentar</button>";
+ console.error(error);
+}
+</script></body></html>
