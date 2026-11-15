@@ -111,6 +111,7 @@ const spots={
  caja:{x:-4.1,z:2.45,label:"Rincón de juguetes"},
  arbol:{x:3.4,z:8.6,label:"Bajo el árbol"},
  biblioteca:{x:-8.2,z:-5.6,label:"Biblioteca"},
+ invernadero:{x:-8.25,z:1.35,label:"Jardín interior"},
  estudio:{x:8.4,z:-5.6,label:"Estudio"},
  comedor:{x:10.5,z:-.1,label:"Comedor"},
  milo:{x:miloRoom.x,z:-6.65,label:"Cuarto de Milo"},
@@ -145,6 +146,7 @@ const spots={
  {id:"descansar",name:"Descansando",place:"camaMilo",weight:2},
  {id:"jardin",name:"Explorando las plantas",place:"arbol",weight:2},
  {id:"leer",name:"Olfateando la biblioteca",place:"biblioteca",weight:1},
+ {id:"plantas",name:"Olfateando las plantas",place:"invernadero",weight:3},
  {id:"estudio",name:"Curioseando el estudio",place:"estudio",weight:1},
  {id:"comedor",name:"Inspeccionando el comedor",place:"comedor",weight:1},
  {id:"coleccionar",name:"Reuniendo sus juguetes",place:"caja",weight:2},
@@ -211,6 +213,7 @@ function apply(b,t,offline){
    state.traits.valentia=clamp(state.traits.valentia+.06);
    if(rand()<.22)log("Exploró el patio y volvió a sus rincones conocidos.","exploracion",t);
   }
+  if(b.id==="plantas"&&rand()<.35)log("Se quedó un rato entre las plantas del jardín interior.","exploracion",t);
   if(b.id==="ordenar"){
    state.progress.gather++;state.traits.orden=clamp(state.traits.orden+.2);
    if(state.progress.gather===3)creation("coleccion","Reunió sus juguetes favoritos en un rincón de la sala.",-4.1,2.4,t);
@@ -493,8 +496,6 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  // Kitchen/sitting room boundary and accessible exit to the garden.
  partitionZ(4.2,-11.7,-1.7);partitionZ(4.2,1.1,11.7);
  // Room-specific visual accents.
- box(3.2,.018,1.5,linen,-8.6,.031,-6.1,false);
- box(2.7,.018,1.7,linen,8.4,.031,-6.3,false);
  // Navigation uses these exact wall and furniture footprints, not visual-only collision.
  const blockers=[];
  const block=(x,z,w,d)=>blockers.push({x1:x-w/2,x2:x+w/2,z1:z-d/2,z2:z+d/2});
@@ -586,9 +587,8 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  // Living room: gallery wall, throw pillows, sideboard, plants, dog activity corner.
  painting(-4.85,2.03,-4.22,.75,.46,deep);painting(-3.57,2.03,-4.22,.72,.46,velvet);
  cushion(-4.5,-2.4,M.gold);cushion(-3.1,-2.4,M.rose);
- plant(-5.25,3.25);books(-5.15,2.9,5);
+ plant(-5.25,3.25);books(-5.05,2.56,5);
  // Bedroom: bedside lighting, dresser, textile basket and framed art.
- painting(2.6,1.75,-4.22,1.6,.8,M.rose);
  cylinder(.17,.21,.4,brass,4.45,.96,-3.44);sphere(.23,M.cream,4.45,1.25,-3.44);
  cushion(1.7,-2.6,M.blue);
  // Kitchen: hanging utensils, backsplash, storage jars and fruit.
@@ -596,16 +596,13 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  for(let i=0;i<5;i++){cylinder(.1,.12,.27,[ceramic,M.blue,M.gold][i%3],1+i*.48,1.02,3.5)}
  for(let i=0;i<4;i++)sphere(.12,[M.red,M.gold,M.leaf][i%3],3.2+(i%2)*.23,1.05,3.25);
  // Library: reading nook with rug, decorative books and houseplant.
- painting(-8.9,1.7,-10.02,1.45,.75,deep);
- plant(-10.8,-5.3);books(-10.6,-8.6,8);
+ plant(-10.8,-5.3);
  // Studio: monitor, drawing board, stationery, art and a small reading rug.
  box(1.18,.7,.08,M.dark,8.8,1.3,-8.2);box(.95,.5,.09,deep,8.8,1.33,-8.12);
  cylinder(.08,.08,.3,metal,8.8,.99,-8.2);
- painting(10.9,1.75,-10.02,1.1,1.2,M.gold);
  for(let i=0;i<5;i++)box(.07,.35,.07,[M.red,M.gold,M.blue][i%3],7.6+i*.12,1.08,-8.05);
  // Dining room: place settings and hanging decorations.
  for(const x of [7.6,9.1])for(const z of [-2.8,-2.1])cylinder(.21,.21,.025,ceramic,x,.89,z);
- painting(10.6,1.6,-4.36,1.15,.75,M.leaf);
  // Yard: agility tunnel, stepping pads and chew station.
  const tunnelMat=mat(0x9a6554,.84);
  for(let i=0;i<5;i++){const ring=new THREE.Mesh(new THREE.TorusGeometry(.49,.09,8,18),tunnelMat);ring.position.set(5.1,.55,7.0+i*.32);scene.add(ring)}
@@ -642,8 +639,6 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  vase(10.45,1,-8.2);plant(10.8,-6.8);
  // Dining: centerpiece, shelves and wall art.
  vase(8.35,.89,-2.45);
- box(2.2,.12,.45,oak,10.45,1.5,-3.9);
- for(let i=0;i<4;i++)cylinder(.13,.13,.22,[M.blue,ceramic,M.rose][i%3],9.7+i*.42,1.69,-3.9);
  // Garden: dog play corner, extra flower pots, small garden shed.
  box(2.4,1.7,1.25,oak,9.6,.85,12.6);
  box(2.6,.16,1.5,deep,9.6,1.8,12.6);
@@ -683,6 +678,97 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
   rug.rotation.x=-Math.PI/2;rug.position.set(x,.032,z);rug.receiveShadow=true;scene.add(rug);
  }
  wovenRug(-3.1,.72,4.1,2.8,"#b78670","#8f6155");
+
+ // Give the open areas distinct uses and palettes without narrowing the doorways.
+ const olive=mat(0x717b56),clay=mat(0xb87555),walnut=mat(0x725345),ochre=mat(0xd9b474);
+ const lilac=mat(0x9a8a9e),studioBlue=mat(0x64888a),rust=mat(0xad674b);
+ const interiorTile=tileTex.clone();interiorTile.repeat.set(2,2.8);
+ interiorTile.needsUpdate=true;
+ box(5.65,.009,7.25,new THREE.MeshStandardMaterial({color:0xc1c49b,map:interiorTile,roughness:.83}),-8.9,.024,-.04,false);
+ wovenRug(-8.48,.8,3.35,2.75,"#b9b394","#737e64");
+ // Indoor garden: window bench, potting station, planters and a mat for Milo.
+ softBox(2.35,.42,.74,olive,-10.85,.27,1.28,.17).rotation.y=Math.PI/2;
+ softBox(2.09,.11,.62,linen,-10.85,.53,1.28,.16).rotation.y=Math.PI/2;
+ softBox(.51,.13,.62,ochre,-10.85,.63,1.93,.13).rotation.y=Math.PI/2;
+ softBox(2.65,.72,.65,olive,-9.9,.39,3.7,.09);
+ softBox(2.77,.10,.75,M.wood,-9.9,.80,3.7,.07);
+ for(const [x,material] of [[-10.78,clay],[-10.04,ceramic],[-9.37,ochre]]){
+  cylinder(.18,.135,.24,material,x,.97,3.7);
+  for(let i=0;i<3;i++)sphere(.15,M.leaf,x+(i-1)*.116,1.17+i%2*.07,3.7,.76,1.33,.81);
+ }
+ plant(-11.0,-2.55);plant(-7.04,3.42);
+ softBox(.98,.11,.65,ochre,-8.54,.10,.64,.16);
+ const wateringCan=cylinder(.13,.11,.25,studioBlue,-8.84,.99,3.68);
+ const spout=cylinder(.035,.047,.30,studioBlue,-8.69,1.02,3.67);
+ spout.rotation.z=-.9;
+ const handle=new THREE.Mesh(new THREE.TorusGeometry(.094,.018,6,16),wateringCan.material);
+ handle.position.set(-8.94,1.01,3.68);scene.add(handle);
+ // Bedroom: soft lilac dressing area and a bench beside the wardrobe.
+ wovenRug(3.08,-6.95,3.95,2.5,"#b4a3b4","#7e7086");
+ softBox(1.54,.43,.66,lilac,3.26,.28,-6.77,.17);
+ softBox(.47,.07,.61,M.cream,3.7,.52,-6.77,.11);
+ softBox(1.68,.76,.62,walnut,3.68,.4,-8.9,.08);
+ for(const y of [.25,.49,.69]){
+  box(1.52,.18,.055,lilac,3.68,y,-8.557,false);
+  box(.20,.038,.05,brass,3.68,y,-8.51,false);
+ }
+ framedMirror(3.68,1.23,-8.95,1.02,.68);
+ vase(4.23,.94,-8.92);
+ wovenRug(2.59,-2.81,3.64,2.78,"#a59baa","#796d84");
+ // Library and studio each have a different reading/work surface.
+ wovenRug(-8.71,-6.66,3.62,2.56,"#8c5753","#623f43");
+ softBox(.73,.28,.56,rust,-8.35,.60,-6.48,.13);
+ box(.31,.05,.23,deep,-6.95,.82,-6.3,false);
+ wovenRug(8.68,-7.09,3.52,3.80,"#829b9e","#486c77");
+ softBox(.60,.78,.89,studioBlue,10.06,.42,-8.22,.07);
+ for(const y of [.29,.51,.69])box(.25,.038,.065,brass,10.06,y,-7.74,false);
+ box(.57,.028,.40,M.cream,9.6,.925,-7.92,false).rotation.y=.16;
+ box(.32,.026,.035,ochre,9.79,.95,-7.92,false).rotation.y=-.33;
+ // Kitchen: sink and utensils built into the existing perimeter counter.
+ box(.84,.046,.52,metal,1.02,.912,3.43);
+ box(.66,.052,.39,studioBlue,1.02,.938,3.44);
+ cylinder(.045,.051,.23,metal,1.03,1.03,3.65);
+ box(.064,.066,.21,metal,1.03,1.13,3.56);
+ cylinder(.19,.16,.14,walnut,2.58,.99,3.47);
+ box(.31,.045,.067,walnut,2.77,1.02,3.47);
+ // Dining: a warm runner, table linen and a low sideboard by the garden.
+ wovenRug(8.64,-1.92,4.75,4.62,"#ba876c","#845845");
+ box(2.42,.012,.43,M.cream,8.35,.884,-2.45,false);
+ softBox(3.18,.77,.70,walnut,9.35,.43,3.74,.08);
+ for(const x of [8.36,9.35,10.34]){
+  box(.87,.58,.055,rust,x,.45,3.36,false);
+  box(.17,.04,.06,brass,x,.59,3.32,false);
+ }
+ for(const x of [8.5,8.8,9.1])cylinder(.13,.13,.029,ceramic,x,.86,3.67);
+ vase(10.38,.9,3.77);
+ wovenRug(8.9,1.59,2.46,1.35,"#ae765b","#845845");
+ // Terrace seating and table face the garden.
+ softBox(1.8,.43,.67,olive,-9.83,.37,5.03,.15);
+ softBox(1.65,.105,.61,linen,-9.83,.62,5.03,.12);
+ softBox(1.78,.48,.18,olive,-9.83,.69,4.76,.12);
+ cylinder(.39,.39,.10,oak,-8.43,.70,5.42);
+ cylinder(.08,.22,.52,metal,-8.43,.39,5.42);
+ block(-8.43,5.42,.78,.78);
+
+ // Small framed prints and sketches provide each area its own visual motif.
+ function roomPrint(x,y,z,width,height,palette,side=1){
+  const [paper,ink,accent]=palette;
+  const map=artTexture(192,128,ctx=>{
+   ctx.fillStyle=paper;ctx.fillRect(0,0,192,128);
+   ctx.fillStyle=accent;ctx.beginPath();ctx.ellipse(129,38,20,20,0,0,2*Math.PI);ctx.fill();
+   ctx.fillStyle=ink;ctx.beginPath();ctx.moveTo(0,112);ctx.bezierCurveTo(47,15,83,112,124,73);
+   ctx.bezierCurveTo(152,45,172,61,192,95);ctx.lineTo(192,128);ctx.lineTo(0,128);ctx.fill();
+  });
+  box(width+.09,height+.09,.055,walnut,x,y,z,false);
+  const art=new THREE.Mesh(new THREE.PlaneGeometry(width,height),new THREE.MeshStandardMaterial({map,roughness:.92}));
+  art.rotation.y=side===1?0:Math.PI;art.position.set(x,y,z+side*.031);scene.add(art);
+ }
+ roomPrint(-9.65,1.68,4.08,.99,.70,["#dddbba","#557454","#cf9e58"],-1);
+ roomPrint(-8.45,1.59,4.08,.69,.57,["#d3d7ae","#687b53","#ac8055"],-1);
+ roomPrint(.65,1.57,-10.31,.66,.47,["#ece0db","#897990","#dbb5a7"]);
+ roomPrint(10.95,1.80,-10.31,.89,.64,["#cbd9d2","#4b7377","#cbb786"]);
+ roomPrint(9.12,1.56,4.08,1.17,.66,["#ead5b6","#99624d","#c29160"],-1);
+ roomPrint(-11.12,1.62,-10.31,.64,.46,["#e7cabb","#773d41","#ccb482"]);
 
  // Milo's room. Keep the center of the rug and both doorways clear for play.
  const sageLinen=new THREE.MeshStandardMaterial({color:0xa8ba97,map:texture("fabric",[187,185,165],13,82),roughness:1});
@@ -850,9 +936,6 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  for(const x of [-4.8,-2.8])softBox(.45,.23,.95,fabricCool,x,.81,-2.38,.13);
  softBox(2.3,.16,1.5,M.cream,2.4,.64,-2.68,.18);
  softBox(1.4,.13,.75,fabricWarm,2.25,.77,-2.72,.16);
- softBox(1.5,.14,1.15,fabricWarm,-8.4,.17,-6.2,.23);
- softBox(1.25,.12,.8,fabricCool,8.7,.18,-6.2,.2);
- softBox(2.5,.14,1.55,M.cream,8.35,.09,-2.45,.2);
  // Built-in wardrobes and panels along room edges.
  for(const x of [1.05,1.9,2.75]){box(.78,2.15,.5,trim,x,1.08,-9.95);box(.045,.22,.04,brass,x+.2,1.13,-9.62)}
  for(let i=0;i<5;i++){box(.78,.78,.55,M.wood,-10.9+i*.84,.43,-9.65);box(.05,.18,.04,brass,-10.65+i*.84,.43,-9.32)}

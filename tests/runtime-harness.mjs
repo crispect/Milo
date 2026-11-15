@@ -17,7 +17,7 @@ class Element {
   hasPointerCapture(){return true}
   getContext(){return {
     createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){},beginPath(){},
-    moveTo(){},bezierCurveTo(){},stroke(){},roundRect(){},fill(){},ellipse(){},save(){},restore(){},
+    moveTo(){},lineTo(){},bezierCurveTo(){},stroke(){},roundRect(){},fill(){},ellipse(){},save(){},restore(){},
     clip(){},fillRect(){},setLineDash(){},fillText(){}
   }}
 }
