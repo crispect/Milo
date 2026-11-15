@@ -1,0 +1,30 @@
+name: Verificar cámara y cuarto de Milo
+on:
+  push:
+    branches: [qa/camara-cuarto]
+permissions:
+  contents: read
+jobs:
+  navegador:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Instalar Three.js y Playwright
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          python -m pip install playwright==1.51.0
+          if ! command -v google-chrome && ! command -v chromium; then
+            python -m playwright install --with-deps chromium
+          fi
+      - name: Probar WebGL y controles táctiles en Chromium
+        run: python scripts/playwright-smoke.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: milo-browser-screens
+          path: browser-screens/
+          retention-days: 2

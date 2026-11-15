@@ -15,9 +15,13 @@ class Element {
   setPointerCapture(){}
   releasePointerCapture(){}
   hasPointerCapture(){return true}
-  getContext(){return {createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){},beginPath(){},moveTo(){},bezierCurveTo(){},stroke(){}}}
+  getContext(){return {
+    createImageData:(w,h)=>({data:new Uint8ClampedArray(w*h*4)}),putImageData(){},beginPath(){},
+    moveTo(){},bezierCurveTo(){},stroke(){},roundRect(){},fill(){},ellipse(){},save(){},restore(){},
+    clip(){},fillRect(){},setLineDash(){},fillText(){}
+  }}
 }
-export function boot({saved,html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),width=1363,renderFailure=false}={}){
+export function boot({saved,html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),width=1363,height=936,renderFailure=false}={}){
   const elements=new Map(),errors=[],queue=[],timers=new Map();let frameId=0;
   const env={now:0,frames:0,errors,queue,elements,storage:new Map(saved?[["milo-life-v1",JSON.stringify(saved)]]:[])};
   const element=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id)};
@@ -33,7 +37,7 @@ export function boot({saved,html=readFileSync(new URL('../index.html',import.met
   const BaseDate=Date;
   class TestDate extends BaseDate {constructor(...args){super(...(args.length?args:[1794690000000+env.now]))}static now(){return 1794690000000+env.now}}
   const context={document,console:{log(){},warn(){},error:e=>errors.push(e)},TEST_THREE:{...Three,WebGLRenderer:Renderer,Clock},Date:TestDate,
-    performance:{now:()=>env.now},innerWidth:width,innerHeight:936,devicePixelRatio:1,
+    performance:{now:()=>env.now},innerWidth:width,innerHeight:height,devicePixelRatio:1,
     localStorage:{getItem:key=>env.storage.get(key)||null,setItem:(key,value)=>env.storage.set(key,value)},
     requestAnimationFrame:fn=>{const id=++frameId;queue.push({id,fn});return id},cancelAnimationFrame(id){const i=queue.findIndex(frame=>frame.id===id);if(i>=0)queue.splice(i,1)},
     setTimeout:(fn,ms)=>{const id=timers.size+1;timers.set(id,{fn,at:env.now+ms});return id},clearTimeout:id=>timers.delete(id),
@@ -45,7 +49,18 @@ export function boot({saved,html=readFileSync(new URL('../index.html',import.met
   const instrumented=module.replace(/const THREE = await import\([^;]+;/,'const THREE = TEST_THREE;').replace(/\}\s*catch\(error\)\{\s*\n document\.querySelector\("#loadError"\)/,'}catch(error){\n document.querySelector("#loadError")');
   // Export closure bindings in memory only; never add a debug API to the game.
   const end=instrumented.lastIndexOf('}catch(error){');
-  const exposed=instrumented.slice(0,end)+`\nwindow.testGame={state,scene,camera,dog,spots,clearAt,clearSegment,nearest,route,blockers,save,startNew,plan,apply,syncProps,propMeshes,DOG_RADIUS,focus, get panMode(){return panMode},animateDog,legs, get gaitPhase(){return gaitPhase}, get gaitWeight(){return gaitWeight},\n navigate(target){carrying=null;carryPhase='';dogTarget=target;moving=true;plan()},\n transport(){current={id:'coleccionar',name:'Test',place:'caja'};beginTransport(current);moving=true;plan()},\n get current(){return current},get moving(){return moving},get target(){return dogTarget},get waypoints(){return waypoints},get carrying(){return carrying},get phase(){return carryPhase},get following(){return following},get radius(){return radius},get azimuth(){return azimuth},get elevation(){return elevation}};\n`+instrumented.slice(end);
+  const exposed=instrumented.slice(0,end)+`
+window.testGame={
+ state,scene,camera,dog,spots,clearAt,clearSegment,nearest,route,blockers,save,startNew,plan,apply,
+ syncProps,propMeshes,DOG_RADIUS,focus,miloRoom,wallSections,animateDog,legs,
+ get gaitPhase(){return gaitPhase},get gaitWeight(){return gaitWeight},
+ navigate(target){current={id:"explorar",name:"Test",place:"patio"};carrying=null;carryPhase="";dogTarget=target;moving=true;plan()},
+ transport(id="coleccionar"){current={...behaviours.find(b=>b.id===id)};beginTransport(current);moving=true;plan()},
+ get current(){return current},get moving(){return moving},get target(){return dogTarget},
+ get waypoints(){return waypoints},get carrying(){return carrying},get phase(){return carryPhase},
+ get cameraView(){return cameraView},get radius(){return radius},get azimuth(){return azimuth},get elevation(){return elevation}
+};
+`+instrumented.slice(end);
   for(const [,script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g))vm.runInContext(script,env.context,{timeout:1000});
   try {vm.runInContext(exposed,env.context,{timeout:10000})}catch(e){errors.push(e)}
   env.game=context.testGame;

@@ -11,7 +11,7 @@ test('CPU startup builds the scene and reaches the first animation frame',()=>{
   assert.equal(env.element('#load').style.display,'none');
 });
 
-test('all 100 room routes are reachable and each segment stays outside obstacles',()=>{
+test('all 144 destination pairs, including Milo’s room, have collision-free routes',()=>{
   const {game:g}=boot();let checked=0;
   for(const a of Object.values(g.spots))for(const b of Object.values(g.spots)){
     let prev=g.nearest(a.x,a.z);const route=g.route(prev,b);
@@ -20,10 +20,10 @@ test('all 100 room routes are reachable and each segment stays outside obstacles
     const target=g.nearest(b.x,b.z);
     assert.ok(Math.hypot(prev.x-target.x,prev.z-target.z)<1e-6);checked++;
   }
-  assert.equal(checked,100);
+  assert.equal(checked,144);
 });
 
-test('Milo walks to all ten destinations without clipping or stalling',()=>{
+test('Milo walks to all twelve destinations without clipping or stalling',()=>{
   const env=boot(),g=env.game;
   for(const target of Object.values(g.spots)){
     g.navigate(target);assert.ok(g.moving,`No route to ${target.label}`);
@@ -91,25 +91,33 @@ test('toys stay on the floor until pickup and persist at the delivery point',()=
   assert.ok(g.clearAt(prop.x,prop.z));
 });
 
-test('camera handlers rotate, zoom, cancel a gesture, pan and resume following',()=>{
-  const env=boot(),g=env.game,canvas=env.renderer.domElement;
-  const azimuth=g.azimuth;
-  env.emit(canvas,'pointerdown',{pointerId:1,clientX:100,clientY:100});
-  env.emit(canvas,'pointermove',{pointerId:1,clientX:200,clientY:130});
-  assert.notEqual(g.azimuth,azimuth);
-  env.emit(canvas,'pointercancel',{pointerId:1});
-  const stopped=g.azimuth;
-  env.emit(canvas,'pointermove',{pointerId:1,clientX:400,clientY:130});
-  assert.equal(g.azimuth,stopped);
-  const radius=g.radius;env.emit(canvas,'wheel',{deltaY:-100});assert.ok(g.radius<radius);
-  env.emit(canvas,'pointerdown',{pointerId:1,clientX:100,clientY:100});
-  env.emit(canvas,'pointerdown',{pointerId:2,clientX:200,clientY:100});
-  env.emit(canvas,'pointermove',{pointerId:1,clientX:95,clientY:105});
-  env.emit(canvas,'pointermove',{pointerId:2,clientX:210,clientY:105});
-  assert.equal(g.following,false);assert.ok(Number.isFinite(g.radius));
-  env.emit(canvas,'pointerup',{pointerId:1});env.emit(canvas,'pointerup',{pointerId:2});
-  env.element('#follow').onclick();assert.equal(g.following,true);
-  env.step();assert.ok(g.camera.position.toArray().every(Number.isFinite));
+test('portrait camera shortcuts frame the room and house, rotate, and resume following',()=>{
+  const env=boot({width:390,height:844}),g=env.game;
+  env.element('#houseView').onclick();
+  env.step(75);
+  assert.equal(g.cameraView,'house');
+  const corners=[[-12,0,-10.5],[12,0,15.5],[12,3,15.5],[-12,3,-10.5]];
+  for(const corner of corners){
+    const point=new THREE.Vector3(...corner).project(g.camera);
+    assert.ok(Math.abs(point.x)<.98&&Math.abs(point.y)<.98,'House fits in a portrait frame');
+  }
+  const angle=g.azimuth;
+  env.element('#rotateView').onclick();
+  env.step(75);
+  assert.ok(Math.abs(g.azimuth-angle+Math.PI/2)<.001);
+  env.element('#roomView').onclick();
+  env.step(75);
+  assert.equal(g.cameraView,'den');
+  assert.ok(Math.hypot(g.focus.x-g.miloRoom.x,g.focus.z-g.miloRoom.z)<.001);
+  assert.ok(g.wallSections.filter(w=>w.roomFront).every(w=>w.opacity<.15),'Front wall reveals room contents');
+  const radius=g.radius;
+  env.emit(env.renderer.domElement,'wheel',{deltaY:-100});
+  assert.ok(g.radius<radius);
+  env.element('#follow').onclick();
+  env.step(75);
+  assert.equal(g.cameraView,'milo');
+  assert.ok(Math.hypot(g.focus.x-g.dog.position.x,g.focus.z-g.dog.position.z)<.13);
+  assert.deepEqual(env.errors,[]);
 });
 
 test('journal and personality panels open and close',()=>{
@@ -171,25 +179,69 @@ test('gait follows traveled distance and smoothly settles when stationary',()=>{
 });
 
 
-test('portrait camera supports immediate pinch and one-finger exploration without following drift',()=>{
- const env=boot({width:390}),g=env.game,c=env.renderer.domElement;
- env.emit(c,'pointerdown',{pointerId:1,clientX:100,clientY:100});
- env.emit(c,'pointermove',{pointerId:1,clientX:200,clientY:100});
- assert.equal(g.following,false);assert.ok(Math.abs(g.azimuth-.58)>1);
- env.emit(c,'pointerdown',{pointerId:2,clientX:300,clientY:100});
- const r=g.radius;env.emit(c,'pointermove',{pointerId:2,clientX:320,clientY:100});
- assert.ok(g.radius<r,'first pinch movement must zoom');
- env.emit(c,'pointerup',{pointerId:2});
- const angle=g.azimuth;env.emit(c,'pointermove',{pointerId:1,clientX:201,clientY:100});
- assert.ok(Math.abs(g.azimuth-angle)<.02,'lifting second finger must not jump');
- env.emit(c,'pointerup',{pointerId:1});env.element('#cameraMode').onclick();
- const before=g.focus.clone(),rotation=g.azimuth;
- env.emit(c,'pointerdown',{pointerId:3,clientX:100,clientY:100});
- env.emit(c,'pointermove',{pointerId:3,clientX:180,clientY:140});
- assert.ok(g.focus.distanceTo(before)>.1);assert.equal(g.azimuth,rotation);
- const manual=g.focus.clone();env.step(60);assert.ok(g.focus.distanceTo(manual)<1e-9);
- env.docEvents.get('blur')();env.emit(c,'pointermove',{pointerId:3,clientX:300,clientY:300});
+test('touch moves the floor with a finger and pinches about the midpoint without jumps',()=>{
+ const width=390,height=844,env=boot({width,height}),g=env.game,c=env.renderer.domElement;
+ const floor=new THREE.Vector3(g.focus.x,.03,g.focus.z);
+ const project=()=>{
+  const point=floor.clone().project(g.camera);
+  return {x:(point.x+1)*width/2,y:(1-point.y)*height/2};
+ };
+ const finger=(type,pointerId,x,y)=>env.emit(c,type,{pointerId,clientX:x,clientY:y});
+ const origin=project(),angle=g.azimuth;
+ finger('pointerdown',1,origin.x,origin.y);
+ finger('pointermove',1,origin.x+35,origin.y+22);
+ env.step();
+ assert.equal(g.cameraView,'free');
+ assert.equal(g.azimuth,angle);
+ const moved=project();
+ assert.ok(Math.hypot(moved.x-origin.x-35,moved.y-origin.y-22)<.01);
+ finger('pointerup',1,moved.x,moved.y);
+ finger('pointerdown',1,moved.x-43,moved.y);finger('pointerdown',2,moved.x+43,moved.y);
+ const radius=g.radius;
+ finger('pointermove',2,moved.x+63,moved.y);
+ assert.ok(g.radius<radius,'First movement should zoom');
+ finger('pointermove',1,moved.x-63,moved.y);env.step();
+ const pinched=project();
+ assert.ok(Math.hypot(moved.x-pinched.x,moved.y-pinched.y)<.01);
+ const before=g.focus.clone();
+ finger('pointerup',2,moved.x+63,moved.y);
+ finger('pointermove',1,moved.x-62,moved.y);env.step();
+ assert.ok(g.focus.distanceTo(before)<.03,'Lifting a finger should not recenter the camera');
+ const manual=g.focus.clone();
+ env.step(60);assert.ok(g.focus.distanceTo(manual)<1e-9);
+ finger('pointercancel',1,moved.x-62,moved.y);
+ finger('pointermove',1,moved.x+200,moved.y+100);
  assert.ok(g.focus.distanceTo(manual)<1e-9);
- env.element('#follow').onclick();assert.equal(g.following,true);assert.equal(g.panMode,false);
- env.step(60);assert.ok(g.focus.distanceTo(manual)>.01);
+ finger('pointerdown',3,100,100);env.docEvents.get('blur')();finger('pointermove',3,200,200);
+ assert.ok(g.focus.distanceTo(manual)<1e-9);
+});
+
+test('existing saves receive six room toys and Milo plays with one and saves its new location',()=>{
+ const seed=boot().game.state;
+ seed.props=seed.props.filter(prop=>prop.home!=='milo');
+ const oldToy=seed.props[0];
+ oldToy.x=-2.1;oldToy.z=1.8;
+ const env=boot({saved:seed}),g=env.game;
+ const toys=g.state.props.filter(prop=>prop.home==='milo');
+ assert.equal(toys.length,6);
+ assert.deepEqual({...g.state.props.find(prop=>prop.id===oldToy.id)},{...oldToy});
+ for(const prop of toys){
+  assert.ok(g.clearAt(prop.x,prop.z),prop.id);
+  assert.ok(g.propMeshes.get(prop.id).children.length>0,prop.id);
+ }
+ const eventCount=g.state.events.length;
+ g.transport('jugarCuarto');
+ const prop=g.carrying,initial={x:prop.x,z:prop.z};
+ assert.equal(prop.home,'milo');
+ let frames=0;
+ while(g.phase==='pickup'&&frames++<12000)env.step();
+ assert.equal(g.phase,'delivery');
+ while(g.phase==='delivery'&&frames++<24000)env.step();
+ assert.equal(g.phase,'');
+ assert.ok(Math.hypot(prop.x-initial.x,prop.z-initial.z)>.3);
+ assert.ok(g.clearAt(prop.x,prop.z)&&prop.z<g.miloRoom.front&&prop.x>g.miloRoom.left&&prop.x<g.miloRoom.right);
+ assert.ok(g.state.events.slice(eventCount).some(event=>event.kind==='juego'&&event.message.includes(prop.label)));
+ const saved=JSON.parse(env.storage.get('milo-life-v1'));
+ assert.equal(saved.props.find(toy=>toy.id===prop.id).x,prop.x);
+ assert.equal(saved.props.find(toy=>toy.id===prop.id).z,prop.z);
 });
