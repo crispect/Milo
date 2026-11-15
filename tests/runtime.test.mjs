@@ -169,3 +169,27 @@ test('gait follows traveled distance and smoothly settles when stationary',()=>{
   }
   assert.ok(g.gaitWeight<1e-6);
 });
+
+
+test('portrait camera supports immediate pinch and one-finger exploration without following drift',()=>{
+ const env=boot({width:390}),g=env.game,c=env.renderer.domElement;
+ env.emit(c,'pointerdown',{pointerId:1,clientX:100,clientY:100});
+ env.emit(c,'pointermove',{pointerId:1,clientX:200,clientY:100});
+ assert.equal(g.following,false);assert.ok(Math.abs(g.azimuth-.58)>1);
+ env.emit(c,'pointerdown',{pointerId:2,clientX:300,clientY:100});
+ const r=g.radius;env.emit(c,'pointermove',{pointerId:2,clientX:320,clientY:100});
+ assert.ok(g.radius<r,'first pinch movement must zoom');
+ env.emit(c,'pointerup',{pointerId:2});
+ const angle=g.azimuth;env.emit(c,'pointermove',{pointerId:1,clientX:201,clientY:100});
+ assert.ok(Math.abs(g.azimuth-angle)<.02,'lifting second finger must not jump');
+ env.emit(c,'pointerup',{pointerId:1});env.element('#cameraMode').onclick();
+ const before=g.focus.clone(),rotation=g.azimuth;
+ env.emit(c,'pointerdown',{pointerId:3,clientX:100,clientY:100});
+ env.emit(c,'pointermove',{pointerId:3,clientX:180,clientY:140});
+ assert.ok(g.focus.distanceTo(before)>.1);assert.equal(g.azimuth,rotation);
+ const manual=g.focus.clone();env.step(60);assert.ok(g.focus.distanceTo(manual)<1e-9);
+ env.docEvents.get('blur')();env.emit(c,'pointermove',{pointerId:3,clientX:300,clientY:300});
+ assert.ok(g.focus.distanceTo(manual)<1e-9);
+ env.element('#follow').onclick();assert.equal(g.following,true);assert.equal(g.panMode,false);
+ env.step(60);assert.ok(g.focus.distanceTo(manual)>.01);
+});

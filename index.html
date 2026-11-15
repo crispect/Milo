@@ -36,7 +36,7 @@ button:focus-visible{outline:3px solid #fff}
 <body>
 <div id="scene"></div><div id="shade"></div>
 <header><div><div class="logo">Milo <span style="font-size:20px">🐾</span></div><div class="tag">Una vida propia</div></div><div class="pill"><strong id="day">Día 1</strong><span id="where">En casa · explorando</span></div></header>
-<div id="bottom"><div id="thought">Milo está descubriendo su hogar…</div><div class="actions"><button class="primary" id="follow">✦ Seguir a Milo</button><button id="journal">📖 Diario</button><button id="personality">♡ Personalidad</button><button id="sound" aria-label="Activar sonidos">🔇 Sonido</button></div><div id="hint">Desliza para girar · Pellizca para acercar</div></div>
+<div id="bottom"><div id="thought">Milo está descubriendo su hogar…</div><div class="actions"><button class="primary" id="follow">✦ Seguir a Milo</button><button id="cameraMode" aria-pressed="false">✥ Mover vista</button><button id="journal">📖 Diario</button><button id="personality">♡ Personalidad</button><button id="sound" aria-label="Activar sonidos">🔇 Sonido</button></div><div id="hint">1 dedo: girar · 2 dedos: mover y acercar</div></div>
 <aside id="panel" aria-label="Información de Milo"><button id="panelClose" aria-label="Cerrar">×</button><h2 id="panelTitle">Diario</h2><div id="panelContent"></div></aside>
 <div id="load"><div><div class="big">🐕</div><h2>La casa de Milo</h2><p>Preparando un pequeño mundo independiente…</p><div id="loadError"></div></div></div>
 <script>
@@ -783,21 +783,56 @@ $("#panelClose").onclick=()=>$("#panel").classList.remove("open");
 
 let following=true,azimuth=.58,elevation=.68,radius=5.5;
 const focus=new THREE.Vector3(-.3,0,0),clock=new THREE.Clock();
-$("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
-const canvas=renderer.domElement;
-const pointers=new Map();let pinchDist=0,oldMid=null;
-canvas.addEventListener("pointerdown",e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId)});
-canvas.addEventListener("pointermove",e=>{
- if(!pointers.has(e.pointerId))return;
- const old=pointers.get(e.pointerId);pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
- if(pointers.size===1){azimuth-=(e.clientX-old.x)*.004;elevation=Math.max(.16,Math.min(1.38,elevation+(e.clientY-old.y)*.003))}
- else if(pointers.size===2){const a=[...pointers.values()],d=Math.hypot(a[0].x-a[1].x,a[0].y-a[1].y),mid={x:(a[0].x+a[1].x)/2,y:(a[0].y+a[1].y)/2};if(pinchDist&&d>.001)radius=Math.max(3.5,Math.min(48,radius*pinchDist/d));if(oldMid){const dx=(mid.x-oldMid.x)*radius*.0015,dz=(mid.y-oldMid.y)*radius*.0015;focus.x-=dx*Math.cos(azimuth)+dz*Math.sin(azimuth);focus.z+=dx*Math.sin(azimuth)-dz*Math.cos(azimuth);following=false;$("#follow").textContent="◌ Vista libre"}pinchDist=d;oldMid=mid}
+let panMode=false;
+function setFollowing(value){following=value;$("#follow").textContent=value?"✦ Siguiendo a Milo":"✦ Volver a Milo"}
+function setPanMode(value){
+ panMode=value;$("#cameraMode").textContent=value?"↻ Girar vista":"✥ Mover vista";
+ $("#cameraMode").setAttribute("aria-pressed",String(value));
+ $("#hint").textContent=value?"1 dedo: mover · 2 dedos: acercar · Girar vista: rotar":"1 dedo: girar · 2 dedos: mover y acercar";
+}
+$("#follow").onclick=()=>{setFollowing(true);setPanMode(false);$("#panel").classList.remove("open")};
+$("#cameraMode").onclick=()=>{setPanMode(!panMode);setFollowing(false)};
+setFollowing(true);
+const canvas=renderer.domElement,pointers=new Map();
+let pinchDist=0,oldMid=null;
+const cameraClamp=(v,min,max)=>Math.max(min,Math.min(max,v));
+function rebaseGesture(){
+ if(pointers.size===2){const [a,b]=[...pointers.values()];pinchDist=Math.hypot(a.x-b.x,a.y-b.y);oldMid={x:(a.x+b.x)/2,y:(a.y+b.y)/2}}
+ else{pinchDist=0;oldMid=null}
+}
+function panCamera(dx,dy){
+ // Match ground displacement to the screen scale, including portrait displays.
+ const scale=2*radius*Math.tan(THREE.MathUtils.degToRad(camera.fov/2))/Math.max(1,innerHeight);
+ const x=dx*scale,z=dy*scale/Math.max(.4,Math.sin(elevation));
+ focus.x=cameraClamp(focus.x-x*Math.cos(azimuth)-z*Math.sin(azimuth),-14,14);
+ focus.z=cameraClamp(focus.z+x*Math.sin(azimuth)-z*Math.cos(azimuth),-14,18);
+}
+canvas.addEventListener("pointerdown",e=>{
+ if(e.button!==undefined&&e.button!==0)return;
+ e.preventDefault();pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);rebaseGesture();
 });
-const end=e=>{pointers.delete(e.pointerId);pinchDist=0;oldMid=null};
+canvas.addEventListener("pointermove",e=>{
+ if(!pointers.has(e.pointerId))return;e.preventDefault();
+ const old=pointers.get(e.pointerId),dx=e.clientX-old.x,dy=e.clientY-old.y;
+ pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});
+ if(!dx&&!dy)return;
+ setFollowing(false);
+ if(pointers.size===1){
+   if(panMode)panCamera(dx,dy);
+   else{const size=Math.max(280,Math.min(innerWidth,innerHeight));azimuth-=dx*Math.PI*1.5/size;elevation=cameraClamp(elevation+dy*Math.PI/size,.25,1.45)}
+ }else if(pointers.size===2){
+   const [a,b]=[...pointers.values()],d=Math.hypot(a.x-b.x,a.y-b.y),mid={x:(a.x+b.x)/2,y:(a.y+b.y)/2};
+   if(pinchDist>8&&d>8)radius=cameraClamp(radius*pinchDist/d,2.5,40);
+   if(oldMid)panCamera(mid.x-oldMid.x,mid.y-oldMid.y);
+   pinchDist=d;oldMid=mid;
+ }
+});
+const end=e=>{pointers.delete(e.pointerId);rebaseGesture();if(canvas.hasPointerCapture(e.pointerId))canvas.releasePointerCapture(e.pointerId)};
 canvas.addEventListener("pointerup",end);canvas.addEventListener("pointercancel",end);
-canvas.addEventListener("lostpointercapture",end);
-canvas.addEventListener("dblclick",()=>{following=true;$("#follow").textContent="✦ Seguir a Milo"});
- canvas.addEventListener("wheel",e=>{e.preventDefault();radius=Math.max(3.5,Math.min(48,radius+Math.sign(e.deltaY)*.85))},{passive:false});
+canvas.addEventListener("lostpointercapture",e=>{pointers.delete(e.pointerId);rebaseGesture()});
+window.addEventListener("blur",()=>{pointers.clear();rebaseGesture()});
+canvas.addEventListener("contextmenu",e=>e.preventDefault());
+canvas.addEventListener("wheel",e=>{e.preventDefault();radius=cameraClamp(radius*Math.exp(cameraClamp(e.deltaY,-200,200)*.0015),2.5,40)},{passive:false});
 let current=choose(),nextAt=performance.now(),lastSave=performance.now(),moving=true;
  let carrying=null,carryPhase="",dogTarget=spots[current.place],waypoints=[];
  function isTransport(b){return b.id==="coleccionar"||b.id==="juguete"}
