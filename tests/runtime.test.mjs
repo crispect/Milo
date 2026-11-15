@@ -11,7 +11,7 @@ test('CPU startup builds the scene and reaches the first animation frame',()=>{
   assert.equal(env.element('#load').style.display,'none');
 });
 
-test('all 144 destination pairs, including Milo’s room, have collision-free routes',()=>{
+test('all 169 destination pairs, including Milo’s room, have collision-free routes',()=>{
   const {game:g}=boot();let checked=0;
   for(const a of Object.values(g.spots))for(const b of Object.values(g.spots)){
     let prev=g.nearest(a.x,a.z);const route=g.route(prev,b);
@@ -20,10 +20,10 @@ test('all 144 destination pairs, including Milo’s room, have collision-free ro
     const target=g.nearest(b.x,b.z);
     assert.ok(Math.hypot(prev.x-target.x,prev.z-target.z)<1e-6);checked++;
   }
-  assert.equal(checked,144);
+  assert.equal(checked,169);
 });
 
-test('Milo walks to all twelve destinations without clipping or stalling',()=>{
+test('Milo walks to all thirteen destinations without clipping or stalling',()=>{
   const env=boot(),g=env.game;
   for(const target of Object.values(g.spots)){
     g.navigate(target);assert.ok(g.moving,`No route to ${target.label}`);

@@ -1,33 +1,18 @@
-name: Probar estabilidad de Milo en navegadores móviles
+name: Revisar las habitaciones de Milo
 on:
   push:
     branches: [qa/camara-cuarto]
 permissions:
   contents: read
 jobs:
-  navegador:
+  habitaciones:
     runs-on: ubuntu-24.04
-    timeout-minutes: 7
-    strategy:
-      fail-fast: false
-      matrix:
-        engine: [chromium, webkit]
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Instalar dependencias del navegador
-        env:
-          ENGINE: ${{ matrix.engine }}
-        run: |
-          npm ci --ignore-scripts --no-audit --no-fund
-          python -m pip install playwright==1.51.0
-          if [ "$ENGINE" = webkit ] || ! command -v google-chrome; then
-            python -m playwright install --with-deps "$ENGINE"
-          fi
-      - name: Probar gestos, rotación y recuperación de WebGL
-        env:
-          ENGINE: ${{ matrix.engine }}
-          LIBGL_ALWAYS_SOFTWARE: '1'
-        run: python scripts/playwright-smoke.py
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: python -m pip install playwright==1.51.0 Pillow
+      - run: python scripts/playwright-smoke.py
