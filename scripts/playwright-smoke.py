@@ -11,7 +11,7 @@ end = source.rfind('}catch(error){')
 assert end > 0
 source = source[:end] + """
 let qaFrames=0,qaAllocations=0;
-const qaRender=renderer.render,qaSetSize=renderer.setDrawingBufferSize;
+const qaRender=renderer.render.bind(renderer),qaSetSize=renderer.setDrawingBufferSize.bind(renderer);
 renderer.render=(...args)=>{qaRender(...args);qaFrames++};
 renderer.setDrawingBufferSize=(...args)=>{qaAllocations++;qaSetSize(...args)};
 const qaLoss=renderer.getContext().getExtension("WEBGL_lose_context");
