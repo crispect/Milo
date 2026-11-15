@@ -266,6 +266,22 @@ scene.add(sun);
    const c=canvas.getContext("2d"),im=c.createImageData(size,size);let v=seed>>>0;
    const rnd=()=>{v=(Math.imul(v,1664525)+1013904223)>>>0;return v/4294967296};
    const rows=Array.from({length:8},()=>({offset:Math.floor(rnd()*256),tones:[rnd()*21-10,rnd()*21-10]}));
+   const patches=kind==="grass"?[[5,17],[13,8],[32,4]].map(([cells,strength])=>({
+    cells,strength,values:Array.from({length:cells*cells},()=>rnd()-.5)
+   })):null;
+   function patchShade(x,y){
+    let shade=0;
+    for(const {cells,strength,values} of patches){
+     const u=x/size*cells,w=y/size*cells;
+     const ix=Math.floor(u),iy=Math.floor(w),a=u-ix,b=w-iy;
+     const right=(ix+1)%cells,bottom=(iy+1)%cells;
+     const tx=a*a*(3-2*a),ty=b*b*(3-2*b);
+     const top=THREE.MathUtils.lerp(values[iy*cells+ix],values[iy*cells+right],tx);
+     const low=THREE.MathUtils.lerp(values[bottom*cells+ix],values[bottom*cells+right],tx);
+     shade+=strength*THREE.MathUtils.lerp(top,low,ty);
+    }
+    return shade;
+   }
    for(let y=0;y<size;y++)for(let x=0;x<size;x++){
      let variation=(rnd()-.5)*grain;
      if(kind==="wood")variation+=Math.sin(y*.39+Math.sin(x*.055)*3)*11+Math.sin(y*.09)*9;
@@ -279,7 +295,7 @@ scene.add(sun);
      if(kind==="plaster")variation+=Math.sin(x*.12+y*.17)*2.5;
      if(kind==="stone")variation+=Math.sin(x*.19)*Math.sin(y*.15)*8;
      if(kind==="tile")variation+=x%64<2||y%64<2?-34:Math.sin((x>>6)*6+(y>>6)*9)*5;
-     if(kind==="grass")variation+=Math.sin(x*Math.PI/32)*Math.sin(y*Math.PI/64)*10;
+     if(patches)variation+=patchShade(x,y);
      if(kind==="fabric")variation+=((x%4===0)||(y%4===0))?-8:3;
      if(kind==="fur")variation+=Math.sin(x*.8+y*.32+Math.sin(y*.07)*1.6)*4;
      const i=(y*size+x)*4;for(let k=0;k<3;k++)im.data[i+k]=Math.max(0,Math.min(255,base[k]+variation));im.data[i+3]=255;
@@ -291,7 +307,7 @@ scene.add(sun);
  const woodTex=texture("wood",[181,135,91],16,22),wallTex=texture("plaster",[226,216,200],13,35),
  fabricTex=texture("fabric",[91,131,122],16,19),stoneTex=texture("stone",[159,153,139],23,28);
  const floorTex=texture("floor",[171,124,81],14,61);floorTex.repeat.set(7,4.55);
- const grassTex=texture("grass",[115,150,90],24,99);grassTex.repeat.set(9,5);
+ const grassTex=texture("grass",[107,143,86],16,99);grassTex.repeat.set(2.6,1.3);
  function mat(color,roughness=1){return new THREE.MeshStandardMaterial({color,roughness})}
 const M={
  earth:mat(0x81a36f),grass:mat(0x86b57b),wall:mat(0xe9dcc8),wood:mat(0xb8845e),
@@ -308,9 +324,12 @@ M.floor=new THREE.MeshStandardMaterial({map:floorTex,roughness:.75});
  function box(w,h,d,m,x,y,z,shadow=true){const o=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),m);o.position.set(x,y,z);o.castShadow=shadow;o.receiveShadow=true;scene.add(o);return o}
 function sphere(r,m,x,y,z,sx=1,sy=1,sz=1,parent=scene){const o=new THREE.Mesh(new THREE.SphereGeometry(r,24,16),m);o.position.set(x,y,z);o.scale.set(sx,sy,sz);o.castShadow=true;parent.add(o);return o}
 function cylinder(r1,r2,h,m,x,y,z,parent=scene){const o=new THREE.Mesh(new THREE.CylinderGeometry(r1,r2,h,12),m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o}
-box(40,.3,40,M.earth,0,-.24,0,false);
+const plinth=softBox(26,.24,33.6,mat(0x8c9684),-.08,-.202,1.0,.52);
+plinth.castShadow=false;
 box(23.8,.12,15.5,M.floor,-.08,-.035,-2.7,false);
 box(23.8,.1,12,M.grass,-.08,-.04,10.2,false);
+box(23.8,.1,4.95,M.grass,-.08,-.045,-12.89,false);
+box(23.8,.04,.76,M.earth,-.08,.004,-11.12,false);
 const wallSections=[];
 const miloWall=new THREE.MeshStandardMaterial({color:0xb7cfb7,map:wallTex,roughness:.94});
 function wall(w,h,d,material,x,y,z,roomFront=false){
@@ -402,6 +421,16 @@ sphere(.35,M.rose,1.1,.33,-.83,1,.35,1.2);
    scene.add(canopy);
  }
 tree(4.1,9.8,1);tree(-4.5,10.2,.85);tree(-9.8,10.9,.75);
+// A strip of planting gives the back windows a view onto the garden.
+const hedge=new THREE.InstancedMesh(leafGeometry,leafMaterial,38),hedgePiece=new THREE.Object3D();
+for(let i=0;i<hedge.count;i++){
+ const x=-11.35+i*.615,y=.27+.16*Math.sin(i*1.9),z=-13.48+Math.cos(i*.81)*.22;
+ hedgePiece.position.set(x,y,z);hedgePiece.rotation.y=i*1.1;
+ hedgePiece.scale.set(.53,.40+(i%5)*.08,.62);hedgePiece.updateMatrix();
+ hedge.setMatrixAt(i,hedgePiece.matrix);hedge.setColorAt(i,foliage[i%foliage.length]);
+}
+hedge.castShadow=true;hedge.receiveShadow=true;scene.add(hedge);
+for(const [x,z,scale] of [[-8,-14.59,.67],[-3.42,-14.52,.73],[4.24,-14.74,.72],[9.08,-14.44,.65]])tree(x,z,scale);
 for(let i=0;i<26;i++){
  const x=-5.2+rand()*10.3,z=4.75+rand()*6.7;
  if(Math.abs(x-1)<1.9&&z<8)continue;
@@ -702,8 +731,17 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
   fold.rotation.y=i%2===0?.21:-.21;
  }
  box(3.81,.047,.055,brass,miloRoom.x,2.61,-10.24,false);
- painting(-4.97,1.72,-10.31,.68,.53,clayLinen);
- painting(-4.97,1.07,-10.31,.54,.37,sageLinen);
+ const pawPrint=artTexture(128,128,ctx=>{
+  ctx.fillStyle="#ddac88";ctx.fillRect(0,0,128,128);
+  drawPaw(ctx,66,68,83,"#7e5345");
+ });
+ const collarPrint=artTexture(128,96,ctx=>{
+  ctx.fillStyle="#bdc6ab";ctx.fillRect(0,0,128,96);
+  ctx.strokeStyle="#52746a";ctx.lineWidth=10;ctx.beginPath();ctx.ellipse(64,42,38,23,-.18,0,2*Math.PI);ctx.stroke();
+  ctx.fillStyle="#a47c49";ctx.beginPath();ctx.ellipse(65,67,11,12,0,0,2*Math.PI);ctx.fill();
+ });
+ painting(-4.97,1.72,-10.31,.64,.54,new THREE.MeshStandardMaterial({map:pawPrint,roughness:1}));
+ painting(-4.97,1.07,-10.31,.53,.37,new THREE.MeshStandardMaterial({map:collarPrint,roughness:1}));
 
  // Real, persistent interactive toys. Meshes are updated from the same state used by the diary.
  const propMeshes=new Map();
