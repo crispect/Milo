@@ -151,3 +151,21 @@ test('a first-render failure stays visible and does not overwrite the previous v
   assert.equal(env.element('#load').style.display,'grid');
   assert.equal(JSON.parse(env.storage.get('milo-life-v1')).lastVisit,42);
 });
+
+
+test('gait follows traveled distance and smoothly settles when stationary',()=>{
+  const g=boot().game;
+  const initial=g.gaitPhase;
+  for(let i=0;i<60;i++)g.animateDog(1/60,.65/60);
+  assert.ok(g.gaitPhase>initial);
+  assert.ok(g.gaitWeight>.99);
+  const stoppedPhase=g.gaitPhase;
+  let previous=g.gaitWeight;
+  for(let i=0;i<120;i++){
+    g.animateDog(1/60,0);
+    assert.equal(g.gaitPhase,stoppedPhase);
+    assert.ok(g.gaitWeight<=previous);previous=g.gaitWeight;
+    for(const leg of g.legs)assert.ok(Number.isFinite(leg.paw.position.y));
+  }
+  assert.ok(g.gaitWeight<1e-6);
+});

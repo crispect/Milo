@@ -588,56 +588,90 @@ for(const x of [-3.9,-2.5])box(.13,.4,.13,M.wood,x,.2,6.5);
  const kennelRoof=new THREE.Mesh(new THREE.ConeGeometry(1.25,.8,4),new THREE.MeshStandardMaterial({color:0x6f4b3b,roughness:.9}));
  kennelRoof.position.set(9.6,2.35,12.6);kennelRoof.rotation.y=Math.PI/4;kennelRoof.castShadow=true;scene.add(kennelRoof);
  const dog=new THREE.Group();dog.scale.setScalar(DOG_SCALE);scene.add(dog);
-const fur=new THREE.MeshStandardMaterial({color:0xb97943,roughness:.98}),lightFur=new THREE.MeshStandardMaterial({color:0xf2c899,roughness:1}),inner=mat(0xb96d65),nose=new THREE.MeshPhysicalMaterial({color:0x272321,roughness:.3,clearcoat:.65}),eye=new THREE.MeshPhysicalMaterial({color:0x17120f,roughness:.13,clearcoat:1});
-sphere(.61,fur,0,.79,-.22,.89,.72,1.52,dog);
- sphere(.47,fur,0,.79,-.67,.9,.75,.9,dog);
-sphere(.34,lightFur,0,.66,.38,.85,.82,1.05,dog);
-sphere(.39,fur,0,1.16,.64,1,.96,1.02,dog);
- sphere(.34,fur,0,1.18,.84,1.1,.9,.9,dog);
-sphere(.24,lightFur,0,.91,1.07,1.0,.65,1.35,dog);
-sphere(.085,nose,0,.93,1.43,1,.7,.85,dog);
- sphere(.17,lightFur,0,.69,1.16,1,.48,.6,dog);
+// Anatomical rig: continuous torso, mobile neck, two-segment legs and a tapered tail.
+const coatMap=texture("fur",[192,154,108],9,811);
+const fur=new THREE.MeshStandardMaterial({color:0xc28a50,map:coatMap,roughness:.94}),
+ lightFur=new THREE.MeshStandardMaterial({color:0xf1d4a5,map:coatMap,roughness:.98}),
+ inner=mat(0x8c5146),nose=new THREE.MeshPhysicalMaterial({color:0x241e1a,roughness:.38,clearcoat:.35}),
+ eye=new THREE.MeshPhysicalMaterial({color:0x291a10,roughness:.16,clearcoat:.8});
+const torso=new THREE.Group();dog.add(torso);
+const profile=[[-1.03,.03],[-.94,.25],[-.72,.40],[-.4,.43],[0,.39],[.32,.42],[.55,.34],[.68,.12],[.70,.02]];
+const torsoGeometry=new THREE.LatheGeometry(profile.map(([z,r])=>new THREE.Vector2(r,z)),32);
+torsoGeometry.rotateX(Math.PI/2);
+const body=new THREE.Mesh(torsoGeometry,fur);body.position.y=1.02;body.scale.set(1,.98,1);body.castShadow=true;torso.add(body);
+sphere(.29,lightFur,0,.92,.45,.88,1.25,.8,torso);
+const headRig=new THREE.Group();headRig.position.set(0,1.18,.45);torso.add(headRig);
+sphere(.29,fur,0,.03,.04,.92,1.3,.85,headRig);
+sphere(.30,fur,0,.25,.27,.92,1.05,1.14,headRig);
+sphere(.22,lightFur,0,.10,.55,.84,.66,1.35,headRig);
+sphere(.105,nose,0,.13,.82,1,.66,.65,headRig);
+sphere(.18,lightFur,0,-.005,.56,.93,.30,1.2,headRig);
+const jaw=new THREE.Group();jaw.position.set(0,-.005,.43);headRig.add(jaw);
+sphere(.15,inner,0,-.025,.20,.7,.13,.8,jaw);
 const eyelids=[],earMeshes=[];
- for(const side of [-1,1]){
- const ear=new THREE.Mesh(new THREE.CapsuleGeometry(.14,.31,5,8),fur);
- ear.position.set(side*.29,1.51,.53);ear.rotation.z=-side*.16;ear.rotation.y=Math.PI/4;ear.castShadow=true;dog.add(ear);earMeshes.push(ear);
- sphere(.075,eye,side*.22,1.16,1.04,1,1,1,dog);
- sphere(.027,M.white,side*.205,1.195,1.10,1,1,1,dog);
- const lid=sphere(.079,fur,side*.22,1.2,1.108,1,.01,1,dog);eyelids.push(lid);
+for(const side of [-1,1]){
+ sphere(.054,eye,side*.225,.30,.47,.85,1,.72,headRig);
+ sphere(.014,M.white,side*.219,.318,.505,1,1,.6,headRig);
+ const lid=sphere(.058,fur,side*.225,.33,.488,1,.01,.75,headRig);eyelids.push(lid);
+ const earPivot=new THREE.Group();earPivot.position.set(side*.24,.42,.16);headRig.add(earPivot);
+ const ear=sphere(.22,fur,side*.035,-.24,-.01,.62,1.65,.32,earPivot);
+ ear.rotation.z=side*.12;earPivot.rotation.z=side*.13;earMeshes.push(earPivot);
 }
+const collar=new THREE.Mesh(new THREE.TorusGeometry(.265,.035,8,32),mat(0x397a72,.65));
+collar.rotation.x=Math.PI/2;collar.position.set(0,1.22,.43);torso.add(collar);
+sphere(.045,M.gold,0,.96,.48,1,1,.25,torso);
 const legs=[];
+const boneGeometry=new THREE.CapsuleGeometry(.085,.3,4,10);
+function boneMesh(material,parent){const m=new THREE.Mesh(boneGeometry,material);m.castShadow=true;parent.add(m);return m}
 for(const side of [-1,1])for(const back of [-1,1]){
- const pivot=new THREE.Group();pivot.position.set(side*.4,.51,back*.51);dog.add(pivot);
- sphere(.145,fur,0,-.19,.03,1,.95,1.3,pivot);
- sphere(.16,lightFur,0,-.38,.16,1,.48,1.3,pivot);
- legs.push({pivot,side,back});
+ const pivot=new THREE.Group();pivot.position.set(side*.29,1.01,back*.54);dog.add(pivot);
+ const upper=boneMesh(fur,pivot),lower=boneMesh(lightFur,pivot);
+ const paw=sphere(.13,lightFur,0,-.90,.07,.85,.50,1.3,pivot);
+ for(let k=-1;k<=1;k++)sphere(.021,nose,k*.055,-.025,.13,.7,.6,1,paw);
+ legs.push({pivot,upper,lower,paw,side,back});
 }
-const tail=new THREE.Group();tail.position.set(0,.93,-.88);dog.add(tail);sphere(.24,fur,0,.06,-.18,.58,.58,1.3,tail);
-// Sculpted details: muzzle, tongue, paw pads, collar and subtly textured coat.
- const muzzleL=sphere(.2,lightFur,-.16,.83,1.13,1,.75,.75,dog);
- const muzzleR=sphere(.2,lightFur,.16,.83,1.13,1,.75,.75,dog);
- sphere(.075,inner,0,.69,1.17,.75,.35,1,dog);
- const tongue=sphere(.085,inner,0,.69,1.22,.7,.12,.9,dog);
- const collar=new THREE.Mesh(new THREE.TorusGeometry(.43,.065,8,32),new THREE.MeshStandardMaterial({color:0x2f7e7a,metalness:.15,roughness:.45}));
- collar.position.set(0,.91,.43);collar.rotation.x=Math.PI/2.9;dog.add(collar);
- sphere(.075,M.gold,0,.54,.78,.85,1,.3,dog);
- for(const leg of legs)for(let k=-1;k<=1;k++)sphere(.045,fur,k*.095,-.43,.23,.7,.4,1,leg.pivot);
- // Low-poly groomed fur tufts use instancing to keep draw calls low on iPhone.
- const furCount=innerWidth<850?220:520;
- const furGeo=new THREE.ConeGeometry(.018,.105,3);
- const furMat=new THREE.MeshStandardMaterial({color:0xb97943,roughness:1,side:THREE.DoubleSide});
- const tufts=new THREE.InstancedMesh(furGeo,furMat,furCount);
- const tuftDummy=new THREE.Object3D();let furSeed=55131;
- const furRand=()=>{furSeed=(Math.imul(furSeed,1664525)+1013904223)>>>0;return furSeed/4294967296};
- for(let i=0;i<furCount;i++){
-   const a=furRand()*Math.PI*2,t=(furRand()-.5)*1.75;
-   const surface=Math.sqrt(Math.max(.02,1-t*t/1.9));
-   tuftDummy.position.set(Math.cos(a)*.54*surface,.79+Math.sin(a)*.42*surface,-.22+t*.84);
-   tuftDummy.rotation.set(Math.cos(a)*.35,furRand()*6.28,Math.sin(a)*.5);
-   tuftDummy.scale.set(.6+furRand()*.7,.6+furRand()*.9,.6+furRand()*.7);
-   tuftDummy.updateMatrix();tufts.setMatrixAt(i,tuftDummy.matrix);
+const tail=new THREE.Group();tail.position.set(0,1.13,-.94);torso.add(tail);
+const tailBones=[];let tailParent=tail;
+for(let i=0;i<5;i++){
+ const joint=new THREE.Group();joint.position.z=i===0?0:-.105;tailParent.add(joint);
+ sphere(.10-i*.014,fur,0,.025,-.07,1,.9,1.5,joint);tailBones.push(joint);tailParent=joint;
+}
+const upAxis=new THREE.Vector3(0,1,0),jointA=new THREE.Vector3(),jointB=new THREE.Vector3(),jointMid=new THREE.Vector3(),boneDelta=new THREE.Vector3();
+function placeBone(mesh,a,b){
+ boneDelta.subVectors(b,a);const length=boneDelta.length();
+ mesh.position.copy(a).add(b).multiplyScalar(.5);
+ mesh.scale.set(1,length/.47,1);mesh.quaternion.setFromUnitVectors(upAxis,boneDelta.normalize());
+}
+let gaitPhase=0,gaitWeight=0,travelSpeed=0;
+function animateDog(dt,distance){
+ const actual=distance/Math.max(dt,.001);
+ gaitWeight+=(Math.min(1,actual/.65)-gaitWeight)*(1-Math.exp(-dt*12));
+ gaitPhase+=distance/(DOG_SCALE*1.05)*Math.PI*2;
+ const blend=gaitWeight;
+ for(const leg of legs){
+   // Diagonal pairs, planted stance followed by a smoothly lifted swing.
+   const phase=(gaitPhase/(Math.PI*2)+(leg.side===leg.back?0:.5))%1;
+   const swing=phase>.62,t=swing?(phase-.62)/.38:phase/.62;
+   const reach=(swing?-.30+.60*(t*t*(3-2*t)):.30-.60*t)*blend;
+   const lift=swing?Math.sin(Math.PI*t)**2*.20*blend:0;
+   jointA.set(0,0,0);jointB.set(0,-.89+lift,reach);
+   const len=jointB.length(),half=len/2,bend=Math.sqrt(Math.max(0,.49*.49-half*half));
+   jointMid.copy(jointB).multiplyScalar(.5);
+   jointMid.z+=(leg.back<0?1:-1)*bend;
+   placeBone(leg.upper,jointA,jointMid);placeBone(leg.lower,jointMid,jointB);
+   leg.paw.position.copy(jointB);leg.paw.position.z+=.055;
  }
- tufts.instanceMatrix.needsUpdate=true;tufts.castShadow=false;dog.add(tufts);
+ torso.position.y=.018*Math.cos(gaitPhase*2)*blend+.008*Math.sin(frame*2.1)*(1-blend);
+ torso.rotation.z=.018*Math.sin(gaitPhase)*blend;
+ headRig.rotation.x=.035*Math.sin(gaitPhase+1)*blend+.025*Math.sin(frame*.8)*(1-blend);
+ headRig.rotation.y=.10*Math.sin(frame*.63)*(1-blend);
+ jaw.rotation.x=.055+.035*Math.sin(frame*2.8);
+ for(let i=0;i<earMeshes.length;i++)earMeshes[i].rotation.z=(i===0?-1:1)*(.13+.055*Math.sin(gaitPhase+.7)*blend);
+ for(let i=0;i<tailBones.length;i++)tailBones[i].rotation.y=Math.sin(frame*4.2-i*.4)*(.08+.08*blend);
+ tail.rotation.x=-.25+.08*Math.sin(frame*1.7);
+ const blink=Math.pow(Math.max(0,Math.cos(frame*1.1)),48);
+ for(const lid of eyelids)lid.scale.y=.01+.85*blink;
+}
  // Additional architectural detail: curtains, carpet layers, pottery and framed wall panels.
  function curtain(x,z,w){const cloth=new THREE.MeshStandardMaterial({color:0xe9d5b8,roughness:1,side:THREE.DoubleSide});for(let i=0;i<7;i++){const panel=box(w/7+.04,1.75,.065,cloth,x-w/2+(i+.5)*w/7,1.45,z);panel.rotation.y=Math.sin(i*1.8)*.12}box(w+.15,.06,.12,brass,x,2.39,z)}
  curtain(-3.7,-4.04,1.45);
@@ -747,7 +781,7 @@ $("#panelClose").onclick=()=>$("#panel").classList.remove("open");
    if(audioOn){soundtrack();nextBird=performance.now()+4500;nextBark=performance.now()+8000}
  };
 
-let following=true,azimuth=.58,elevation=.32,radius=11;
+let following=true,azimuth=.58,elevation=.68,radius=5.5;
 const focus=new THREE.Vector3(-.3,0,0),clock=new THREE.Clock();
 $("#follow").onclick=()=>{following=!following;$("#follow").textContent=following?"✦ Seguir a Milo":"◌ Vista libre";if(following)$("#panel").classList.remove("open")};
 const canvas=renderer.domElement;
@@ -830,27 +864,24 @@ function animate(){
  const hour=new Date().getHours();const night=hour<7||hour>19;
  sun.intensity=night?.75:2.3;ambient.intensity=night?1.05:1.85;windowGlow.intensity=night?2.2:.5;
  if(!moving&&performance.now()>nextAt)startNew();
- let speed=0;
+ let speed=0;const beforeX=dog.position.x,beforeZ=dog.position.z;
+ travelSpeed+=((moving?.65:0)-travelSpeed)*(1-Math.exp(-dt*5));
  if(moving){
   const waypoint=waypoints[0]||dogTarget;
    const dx=waypoint.x-dog.position.x,dz=waypoint.z-dog.position.z,dist=Math.hypot(dx,dz);
   if(dist<.00001){if(waypoints.length)waypoints.shift();else if(carryPhase==="pickup")pickup();else completed()}else{
    speed=Math.min(1,dist*2);
-   const step=Math.min(dist,dt*1.35),nx=dog.position.x+dx/dist*step,nz=dog.position.z+dz/dist*step;
+   const step=Math.min(dist,dt*travelSpeed),nx=dog.position.x+dx/dist*step,nz=dog.position.z+dz/dist*step;
     if(clearAt(nx,nz)){dog.position.x=nx;dog.position.z=nz}else{moving=false;waypoints=[];nextAt=performance.now()+1200;carrying=null;carryPhase=""}
    let heading=Math.atan2(dx,dz);
    dog.rotation.y+=Math.atan2(Math.sin(heading-dog.rotation.y),Math.cos(heading-dog.rotation.y))*Math.min(1,dt*8);
   }
  }
- for(let i=0;i<legs.length;i++)legs[i].pivot.rotation.x=Math.sin(frame*11+(i%2)*Math.PI+(i<2?0:Math.PI))*.45*speed;
- tail.rotation.y=Math.sin(frame*10)*(.23+.28*speed);
-  const blinking=Math.pow(Math.max(0,Math.sin(frame*1.4)),48);for(const lid of eyelids)lid.scale.y=.01+blinking*.9;
-  for(let i=0;i<earMeshes.length;i++)earMeshes[i].rotation.z=(i===0?1:-1)*(.16+.055*Math.sin(frame*2.4));
-  dog.scale.y=DOG_SCALE*(1+.012*Math.sin(frame*2.3)*(1-speed*.6));
- dog.position.y=.13+Math.abs(Math.sin(frame*11))*.018*speed;
+ animateDog(dt,Math.hypot(dog.position.x-beforeX,dog.position.z-beforeZ));
+ dog.position.y=.012;
  if(following){focus.x+=(dog.position.x-focus.x)*dt*1.8;focus.z+=(dog.position.z-focus.z)*dt*1.8}
  const length=radius;camera.position.set(focus.x+Math.sin(azimuth)*Math.cos(elevation)*length,Math.sin(elevation)*length+1.2,focus.z+Math.cos(azimuth)*Math.cos(elevation)*length);
- camera.lookAt(focus.x,.8,focus.z);
+ camera.lookAt(focus.x,.38,focus.z);
  syncProps();renderer.render(scene,camera);
  if(performance.now()-lastSave>5000){savePosition();state.lastSim=Date.now();save();lastSave=performance.now()}
  }catch(error){window.miloStartup.fail(error);console.error(error);return false}
