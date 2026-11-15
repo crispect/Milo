@@ -21,15 +21,15 @@ class Element {
     clip(){},fillRect(){},setLineDash(){},fillText(){}
   }}
 }
-export function boot({saved,html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),width=1363,height=936,renderFailure=false}={}){
+export function boot({saved,html=readFileSync(new URL('../index.html',import.meta.url),'utf8'),width=1363,height=936,touch=false,pixelRatio=1,renderFailure=false}={}){
   const elements=new Map(),errors=[],queue=[],timers=new Map();let frameId=0;
   const env={now:0,frames:0,errors,queue,elements,storage:new Map(saved?[["milo-life-v1",JSON.stringify(saved)]]:[])};
   const element=id=>{if(!elements.has(id))elements.set(id,new Element());return elements.get(id)};
   const docEvents=new Map();
   const document={hidden:false,querySelector:element,createElement:()=>new Element(),addEventListener:(name,fn)=>docEvents.set(name,fn)};
   class Renderer {
-    constructor(){this.domElement=new Element();this.shadowMap={};this.capabilities={getMaxAnisotropy:()=>4};this.info={render:{calls:0}};env.renderer=this}
-    setSize(){} setPixelRatio(){}
+    constructor(options){this.domElement=new Element();this.shadowMap={};this.capabilities={getMaxAnisotropy:()=>4};this.info={render:{calls:0}};this.options=options;this.sizes=[];env.renderer=this}
+    setDrawingBufferSize(width,height,ratio){this.sizes.push({width,height,ratio})}
     render(scene,camera){if(renderFailure)throw Error('Simulated first-render failure');scene.updateMatrixWorld();camera.updateMatrixWorld();env.frames++}
     getContext(){return {isContextLost:()=>false}}
   }
@@ -37,7 +37,8 @@ export function boot({saved,html=readFileSync(new URL('../index.html',import.met
   const BaseDate=Date;
   class TestDate extends BaseDate {constructor(...args){super(...(args.length?args:[1794690000000+env.now]))}static now(){return 1794690000000+env.now}}
   const context={document,console:{log(){},warn(){},error:e=>errors.push(e)},TEST_THREE:{...Three,WebGLRenderer:Renderer,Clock},Date:TestDate,
-    performance:{now:()=>env.now},innerWidth:width,innerHeight:height,devicePixelRatio:1,
+    performance:{now:()=>env.now},innerWidth:width,innerHeight:height,devicePixelRatio:pixelRatio,
+    matchMedia:()=>({matches:touch}),
     localStorage:{getItem:key=>env.storage.get(key)||null,setItem:(key,value)=>env.storage.set(key,value)},
     requestAnimationFrame:fn=>{const id=++frameId;queue.push({id,fn});return id},cancelAnimationFrame(id){const i=queue.findIndex(frame=>frame.id===id);if(i>=0)queue.splice(i,1)},
     setTimeout:(fn,ms)=>{const id=timers.size+1;timers.set(id,{fn,at:env.now+ms});return id},clearTimeout:id=>timers.delete(id),

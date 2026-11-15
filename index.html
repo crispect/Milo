@@ -7,9 +7,9 @@
 <title>Milo · Una vida propia</title>
 <style>
 :root{color-scheme:dark;--paper:#f4e9d4;--ink:#153133;--sub:#9db3ae;--glass:rgba(18,38,40,.87)}
-*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#a4cfbd;color:white}
-#scene{position:fixed;inset:0;touch-action:none;user-select:none;-webkit-user-select:none}
-#scene canvas{display:block;touch-action:none;cursor:grab}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;overscroll-behavior:none;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:#a4cfbd;color:white}
+#scene{position:fixed;inset:0;overflow:hidden;touch-action:none;user-select:none;-webkit-user-select:none;-webkit-touch-callout:none}
+#scene canvas{display:block;width:100%;height:100%;touch-action:none;cursor:grab}
 #scene canvas:active{cursor:grabbing}
 #shade{position:fixed;inset:0;pointer-events:none;background:linear-gradient(180deg,rgba(10,27,28,.45),transparent 25%,transparent 65%,rgba(10,27,28,.34))}
 header{position:fixed;top:0;left:0;right:0;display:flex;align-items:flex-start;justify-content:space-between;gap:12px;padding:max(18px,env(safe-area-inset-top)) 20px 0;pointer-events:none}
@@ -26,7 +26,7 @@ button{appearance:none;border:0;border-radius:50px;background:var(--glass);color
 .camera-bar #rotateView{background:#ffffff16}
 button:focus-visible{outline:3px solid #fff}
 #hint{font-size:12px;color:#eef5e9;text-shadow:0 1px 5px #203536;text-align:center}
-#panel{position:fixed;inset:0 0 0 auto;width:min(420px,100%);background:#173437ed;backdrop-filter:blur(24px);padding:calc(26px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));transform:translateX(103%);transition:transform .22s ease;box-shadow:-15px 0 50px #0005;overflow:auto;z-index:3}
+#panel{position:fixed;inset:0 0 0 auto;width:min(420px,100%);background:#173437ed;backdrop-filter:blur(24px);padding:calc(26px + env(safe-area-inset-top)) 24px calc(24px + env(safe-area-inset-bottom));transform:translateX(103%);transition:transform .22s ease;box-shadow:-15px 0 50px #0005;overflow:auto;overscroll-behavior:contain;z-index:3}
 #panel.open{transform:translateX(0)}#panelClose{float:right;padding:8px 14px;background:#ffffff24;font-size:19px}
 #panel h2{margin:5px 0 8px;font-size:29px;letter-spacing:-.7px}#panel h3{color:#ffd48a;font-size:14px;margin:26px 0 10px}#panel p{color:#d8e7df;line-height:1.55;font-size:14px}
 .event{background:#ffffff0b;padding:12px 14px;margin:8px 0;border:1px solid #ffffff13;border-radius:15px;font-size:13px;line-height:1.5}
@@ -59,10 +59,12 @@ button:focus-visible{outline:3px solid #fff}
 (()=>{
  let ready=false;
  const loading=document.querySelector("#load"),message=document.querySelector("#load p"),details=document.querySelector("#loadError");
- function fail(error){
+ function fail(error,recovering=false){
    clearTimeout(timer);loading.style.display="grid";
    const reason=String(error?.message||error||"Error desconocido");
-   message.textContent=/WebGL|context/i.test(reason)?"Este navegador no pudo iniciar o mantener WebGL. Prueba recargar la página o abrirla en otro navegador con soporte 3D.":"No se pudo iniciar la casa de Milo. Puedes volver a intentarlo; tu progreso guardado se conserva.";
+   if(recovering)message.textContent="Se interrumpió la vista 3D. Milo intenta recuperarla y tu progreso está guardado.";
+   else if(/WebGL|context/i.test(reason))message.textContent="Este navegador no pudo iniciar o mantener WebGL. Prueba recargar la página o abrirla en otro navegador con soporte 3D.";
+   else message.textContent="No se pudo mostrar la casa de Milo. Puedes volver a intentarlo; tu progreso guardado se conserva.";
    const diagnostic=document.createElement("p");diagnostic.style.fontSize="12px";diagnostic.textContent=reason;
    const retry=document.createElement("button");retry.textContent="Reintentar";retry.onclick=()=>location.reload();
    details.replaceChildren(diagnostic,retry);
@@ -241,10 +243,13 @@ const summary=oldVisit?state.events.filter(e=>e.t>oldVisit):[];
 state.lastVisit=NOW;
 const scene=new THREE.Scene();
 scene.background=new THREE.Color(0xb7d4cc);
-const camera=new THREE.PerspectiveCamera(43,innerWidth/innerHeight,.12,160);
-const renderer=new THREE.WebGLRenderer({antialias:true,alpha:false,powerPreference:"high-performance"});
-renderer.setSize(innerWidth,innerHeight);
-renderer.setPixelRatio(Math.min(devicePixelRatio||1,innerWidth<850?1.5:2));
+const camera=new THREE.PerspectiveCamera(43,1,.12,160);
+const touchScreen=window.matchMedia?.("(pointer: coarse)")?.matches===true;
+let pixelRatioLimit=touchScreen?1.2:2;
+const viewport={width:0,height:0,ratio:0};
+const renderer=new THREE.WebGLRenderer({
+ antialias:!touchScreen,alpha:false,powerPreference:touchScreen?"default":"high-performance"
+});
 renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;
 renderer.outputColorSpace=THREE.SRGBColorSpace;
 renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.20;
@@ -252,7 +257,7 @@ $("#scene").appendChild(renderer.domElement);
 const ambient=new THREE.HemisphereLight(0xfff0dc,0x788781,1.48);scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xffe6c9,2.6);
 sun.position.set(-9,19,12);sun.castShadow=true;
-sun.shadow.mapSize.setScalar(innerWidth<850?1536:2048);
+sun.shadow.mapSize.setScalar(touchScreen?1024:2048);
 sun.shadow.camera.left=-18;sun.shadow.camera.right=18;
 sun.shadow.camera.top=19;sun.shadow.camera.bottom=-19;sun.shadow.camera.far=56;
 sun.shadow.normalBias=.015;sun.shadow.bias=-.00012;
@@ -1155,10 +1160,11 @@ function cameraPose(){
 }
 const dragStartWorld=new THREE.Vector3(),dragEndWorld=new THREE.Vector3();
 function pointOnFloor(point,out){
- out.set(point.x/innerWidth*2-1,1-point.y/innerHeight*2,.5).unproject(camera).sub(camera.position);
- if(out.y>=-.001)return false;
+ if(!viewport.width||!viewport.height)return false;
+ out.set(point.x/viewport.width*2-1,1-point.y/viewport.height*2,.5).unproject(camera).sub(camera.position);
+ if(!Number.isFinite(out.y)||out.y>=-.001)return false;
  out.multiplyScalar((.03-camera.position.y)/out.y).add(camera.position);
- return true;
+ return Number.isFinite(out.x)&&Number.isFinite(out.z);
 }
 function dragView(from,to,zoom=1){
  if(cameraView!=="free")setViewIndicator("free");
@@ -1179,15 +1185,22 @@ function gesturePoint(){
  const [a,b]=pointers.values();
  return b?{x:(a.x+b.x)/2,y:(a.y+b.y)/2,span:Math.hypot(a.x-b.x,a.y-b.y)}:a;
 }
+// Cancel native touch gestures only on the scene, including Safari's pinch events.
+function cancelNativeGesture(event){if(event.cancelable)event.preventDefault()}
+for(const type of ["touchstart","touchmove","gesturestart","gesturechange"]){
+ canvas.addEventListener(type,cancelNativeGesture,{passive:false});
+}
+function hasPointerPosition(event){return Number.isFinite(event.clientX)&&Number.isFinite(event.clientY)}
 canvas.addEventListener("pointerdown",event=>{
- if((event.button!==undefined&&event.button!==0)||pointers.size>=2)return;
+ if((event.button!==undefined&&event.button!==0)||pointers.size>=2||!hasPointerPosition(event)||!viewport.width)return;
  event.preventDefault();
  pointers.set(event.pointerId,{x:event.clientX,y:event.clientY});
- canvas.setPointerCapture(event.pointerId);
+ // An interrupted touch can end before WebKit grants capture.
+ try{canvas.setPointerCapture(event.pointerId)}catch{}
 });
 canvas.addEventListener("pointermove",event=>{
  const previous=pointers.get(event.pointerId);
- if(!previous)return;
+ if(!previous||!hasPointerPosition(event))return;
  event.preventDefault();
  const dx=event.clientX-previous.x,dy=event.clientY-previous.y;
  if(dx===0&&dy===0)return;
@@ -1204,8 +1217,9 @@ window.addEventListener("blur",()=>pointers.clear());
 canvas.addEventListener("contextmenu",event=>event.preventDefault());
 canvas.addEventListener("wheel",event=>{
  event.preventDefault();
- const point={x:event.clientX??innerWidth/2,y:event.clientY??innerHeight/2};
- const delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?innerHeight:1);
+ if(!viewport.width||!Number.isFinite(event.deltaY)||event.deltaY===0)return;
+ const point=hasPointerPosition(event)?{x:event.clientX,y:event.clientY}:{x:viewport.width/2,y:viewport.height/2};
+ const delta=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?viewport.height:1);
  dragView(point,point,Math.exp(cameraClamp(delta,-220,220)*.0016));
 },{passive:false});
 
@@ -1282,13 +1296,59 @@ document.querySelector("#load p").textContent="Iniciando la vida de Milo…";
  if(!clearAt(dog.position.x,dog.position.z)){const safe=nearest(dog.position.x,dog.position.z);dog.position.set(safe.x,.05,safe.z)}
  plan();
  setCameraView("milo",true);
-let webglLost=false,animationId=null;
+let webglLost=false,recovering=false,hasRendered=false,renderFailed=false,activePage=true,animationId=null;
+let resizeAt=0;
+function syncViewport(now){
+ if(now<resizeAt)return viewport.width>0;
+ const width=Math.floor(innerWidth),height=Math.floor(innerHeight);
+ if(!Number.isFinite(width)||!Number.isFinite(height)||width<=0||height<=0){
+  resizeAt=now+100;
+  return viewport.width>0;
+ }
+ resizeAt=Infinity;
+ const ratio=Math.min(devicePixelRatio||1,pixelRatioLimit);
+ if(width!==viewport.width||height!==viewport.height||ratio!==viewport.ratio){
+  renderer.setDrawingBufferSize(width,height,ratio);
+  Object.assign(viewport,{width,height,ratio});
+  camera.aspect=width/height;camera.updateProjectionMatrix();
+  const preset=cameraViews[cameraView];
+  if(preset?.width)cameraGoal.radius=fitView(preset,cameraGoal.azimuth);
+  pointers.clear();
+ }
+ return true;
+}
+function canRender(){return activePage&&!document.hidden&&!webglLost&&!renderFailed}
+function pauseRendering(){
+ pointers.clear();
+ if(animationId!==null)cancelAnimationFrame(animationId);
+ animationId=null;
+}
+function resumeRendering(){
+ if(animationId!==null||!canRender())return;
+ resizeAt=0;
+ clock.getDelta();
+ animate();
+}
+function checkpoint(){
+ if(!hasRendered)return;
+ savePosition();
+ state.lastSim=Date.now();
+ save();
+}
 canvas.addEventListener("webglcontextlost",event=>{
- event.preventDefault();pointers.clear();webglLost=true;cancelAnimationFrame(animationId);animationId=null;savePosition();save();
- window.miloStartup.fail(Error("Se perdió el contexto WebGL. Tu progreso se ha guardado."));
+ event.preventDefault();
+ if(webglLost)return;
+ webglLost=true;recovering=true;
+ pauseRendering();
+ checkpoint();
+ pixelRatioLimit=1;
+ window.miloStartup.fail(Error("Se perdió el contexto WebGL."),true);
 });
 canvas.addEventListener("webglcontextrestored",()=>{
- webglLost=false;sun.shadow.needsUpdate=true;clock.getDelta();if(animate())window.miloStartup.ready();
+ if(!webglLost)return;
+ webglLost=false;renderFailed=false;resizeAt=0;
+ sun.shadow.needsUpdate=true;
+ resumeRendering();
 });
 let frame=0,nextLighting=0;
 function updateLighting(now){
@@ -1300,8 +1360,14 @@ function updateLighting(now){
  scene.background.setHex(night?0x688680:0xb7d4cc);
 }
 function animate(){
- if(webglLost)return;
+ animationId=null;
+ if(!canRender())return;
  try{
+ const now=performance.now();
+ if(!syncViewport(now)){
+  animationId=requestAnimationFrame(animate);
+  return;
+ }
  const dt=Math.min(clock.getDelta(),.04);frame+=dt;
   if(audioOn&&audioCtx){if(audioCtx.state==="running"&&performance.now()>nextBird){birds();nextBird=performance.now()+10000+Math.random()*12000}if(performance.now()>nextBark){if(Math.random()<.35)bark();nextBark=performance.now()+16000+Math.random()*16000}if(!animate.nextMusic||performance.now()>animate.nextMusic){soundtrack();animate.nextMusic=performance.now()+3400}}
  updateLighting(performance.now());
@@ -1323,20 +1389,29 @@ function animate(){
  dogShadow.position.set(dog.position.x,.041,dog.position.z);dogShadow.rotation.z=dog.rotation.y;
  updateCamera(dt);
  syncProps();renderer.render(scene,camera);
- if(performance.now()-lastSave>5000){savePosition();state.lastSim=Date.now();save();lastSave=performance.now()}
- }catch(error){window.miloStartup.fail(error);console.error(error);return false}
+ if(!hasRendered||recovering){
+  if(!renderer.getContext().isContextLost()){
+   hasRendered=true;recovering=false;
+   window.miloStartup.ready();
+   checkpoint();lastSave=now;
+  }
+ }else if(now-lastSave>5000){checkpoint();lastSave=now}
+ }catch(error){
+  renderFailed=true;pauseRendering();
+  checkpoint();window.miloStartup.fail(error);console.error(error);
+  return;
+ }
  animationId=requestAnimationFrame(animate);
- return true;
 }
-if(animate()){window.miloStartup.ready();savePosition();save()}
-window.addEventListener("resize",()=>{
- camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);
- const preset=cameraViews[cameraView];
- if(preset?.width)cameraGoal.radius=fitView(preset,cameraGoal.azimuth);
- pointers.clear();
+// Wait for iOS toolbar and orientation transitions before allocating a new buffer.
+window.addEventListener("resize",()=>{resizeAt=performance.now()+100});
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden){pauseRendering();checkpoint()}
+ else resumeRendering();
 });
-document.addEventListener("visibilitychange",()=>{if(document.hidden){pointers.clear();savePosition();state.lastSim=Date.now();save()}});
-window.addEventListener("pagehide",()=>{savePosition();state.lastSim=Date.now();save()});
+window.addEventListener("pagehide",()=>{activePage=false;pauseRendering();checkpoint()});
+window.addEventListener("pageshow",()=>{activePage=true;resumeRendering()});
+resumeRendering();
 }catch(error){
  window.miloStartup.fail(error);
  console.error(error);

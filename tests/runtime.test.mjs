@@ -129,7 +129,7 @@ test('journal and personality panels open and close',()=>{
 });
 
 test('WebGL loss preserves progress, displays a retry and restores one animation loop',()=>{
-  const env=boot();env.step(10);const before=env.frames;
+  const env=boot({width:390,height:844,touch:true,pixelRatio:3});env.step(10);const before=env.frames;
   env.emit(env.renderer.domElement,'webglcontextlost');env.step(2);
   assert.equal(env.frames,before);
   assert.equal(env.element('#load').style.display,'grid');
@@ -139,9 +139,59 @@ test('WebGL loss preserves progress, displays a retry and restores one animation
   assert.equal(env.frames,before+2);
   assert.equal(env.queue.length,1);
   assert.equal(env.element('#load').style.display,'none');
+  assert.equal(env.renderer.sizes.at(-1).ratio,1);
   env.emit(env.renderer.domElement,'webglcontextlost');
   env.emit(env.renderer.domElement,'webglcontextrestored');
   assert.equal(env.queue.length,1,'Immediate restoration must not duplicate the loop');
+});
+
+test('mobile drags ignore invalid touch coordinates and repeated viewport changes',()=>{
+ const env=boot({width:390,height:844,touch:true,pixelRatio:3}),g=env.game,canvas=env.renderer.domElement;
+ const resize=env.docEvents.get('resize');
+ assert.deepEqual(env.renderer.sizes,[{width:390,height:844,ratio:1.2}]);
+ assert.equal(env.renderer.options.antialias,false);
+ let blocked=0;
+ for(const type of ['touchstart','touchmove','gesturestart','gesturechange']){
+  env.emit(canvas,type,{cancelable:true,preventDefault:()=>blocked++});
+ }
+ assert.equal(blocked,4);
+ env.emit(canvas,'pointerdown',{pointerId:1,clientX:180,clientY:340});
+ resize();env.step(8);
+ env.emit(canvas,'pointermove',{pointerId:1,clientX:NaN,clientY:340});
+ const before=g.focus.clone();
+ env.emit(canvas,'pointermove',{pointerId:1,clientX:202,clientY:355});
+ env.step();
+ assert.equal(g.cameraView,'free');
+ assert.ok(g.focus.distanceTo(before)>.1);
+ assert.equal(env.renderer.sizes.length,1);
+ env.context.innerHeight=0;resize();env.step(8);
+ assert.equal(env.renderer.sizes.length,1,'Transient dimensions must not resize the canvas');
+ env.context.innerWidth=844;env.context.innerHeight=390;resize();env.step(3);
+ env.context.innerHeight=380;resize();env.step(8);
+ assert.deepEqual(env.renderer.sizes,[{width:390,height:844,ratio:1.2},{width:844,height:380,ratio:1.2}]);
+ assert.ok(g.camera.position.toArray().every(Number.isFinite));
+ assert.deepEqual(env.errors,[]);
+});
+
+test('graphics restore in the background and resume once when the page returns',()=>{
+ const env=boot(),canvas=env.renderer.domElement,before=env.frames;
+ env.document.hidden=true;env.docEvents.get('visibilitychange')();
+ env.docEvents.get('pagehide')();
+ env.emit(canvas,'webglcontextlost');
+ env.emit(canvas,'webglcontextrestored');
+ env.step(12);
+ assert.equal(env.frames,before);
+ assert.equal(env.element('#load').style.display,'grid');
+ assert.equal(env.queue.length,0);
+ env.docEvents.get('pageshow')();
+ assert.equal(env.frames,before);
+ env.document.hidden=false;env.docEvents.get('visibilitychange')();
+ env.docEvents.get('pageshow')();
+ env.step();
+ assert.equal(env.frames,before+2);
+ assert.equal(env.queue.length,1);
+ assert.equal(env.element('#load').style.display,'none');
+ assert.deepEqual(env.errors,[]);
 });
 
 test('a render exception stops scheduling frames and shows a retry',()=>{
